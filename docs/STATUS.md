@@ -42,3 +42,9 @@ block the whole output. Generic errors contain no private values. Markdown
 metacharacters and HTML are escaped; URLs are text, not clickable message targets.
 Synthetic unit/CLI tests cover day 6/7/8, received/unknown/stale responses, missing
 mapping evidence, prior reminder, validation, escaping and a legacy BOM CSV.
+
+## Reading the municipal record
+
+The106 library now has an explicit read-only own-reporter case listing method.
+See [CASE-LISTING.md](CASE-LISTING.md) for the verified app route, privacy limits
+and caller authority requirements. No public CLI/HTTP data dump is exposed.

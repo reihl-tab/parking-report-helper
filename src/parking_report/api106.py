@@ -14,6 +14,8 @@ import tempfile
 import unicodedata
 import urllib.error
 import urllib.request
+import urllib.parse
+from datetime import date
 import uuid
 import warnings
 from filelock import FileLock, Timeout
@@ -224,6 +226,52 @@ class Municipality:
         if not token:
             raise APIError('Login returned no token.')
         return token
+
+    def list_cases(self, token: str, reporter: dict[str, Any], *, from_date: str) -> dict[str, Any]:
+        """GET the authorized reporter's cases; never register/update a contact.
+
+        Caller must obtain reporter from its private configuration and establish
+        authority separately. Neither a national-ID checksum nor this app token
+        proves ownership. Raw case data must not reach public logs/artifacts.
+        """
+        number = reporter.get('ContactIdNumber') if isinstance(reporter, dict) else None
+        kind = reporter.get('ContactIdType') if isinstance(reporter, dict) else None
+        if kind != '100000000' or not isinstance(number, str) or not re.fullmatch(r'[0-9]{9}', number):
+            raise InputError('Supply the configured reporter identity and supported ID type.')
+        products = [int(digit) * (1 + i % 2) for i, digit in enumerate(number)]
+        if number == '000000000' or sum(n if n < 10 else n - 9 for n in products) % 10:
+            raise InputError('Configured reporter ID checksum is invalid.')
+        if not isinstance(token, str) or not token or len(token) > 4096 or any(c.isspace() or ord(c) < 32 for c in token):
+            raise InputError('Invalid session token.')
+        try:
+            if not isinstance(from_date, str) or len(from_date) != 10 or date.fromisoformat(from_date).isoformat() != from_date:
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise InputError('Supply an explicit ISO start date.') from None
+        # Shape confirmed from the supplied app and the established private
+        # read-only client, not endpoint discovery. Encode the token as one segment.
+        endpoint = ('GetContactCases/' + urllib.parse.quote(token, safe='') +
+                    '/100000000/' + number + '?from=' + from_date + '&caseType=2')
+        request = urllib.request.Request(BASE + endpoint, method='GET', headers={
+            'Ocp-Apim-Subscription-Key': self.credentials['subscription_key'],
+            'Content-Type': 'text/plain', 'User-Agent': 'App 106'})
+        try:
+            with urllib.request.build_opener(NoRedirect()).open(request, timeout=45) as response:
+                raw = response.read(16 * 1024 * 1024 + 1)
+            if len(raw) > 16 * 1024 * 1024:
+                raise ValueError()
+            result = json.loads(raw)
+            if (not isinstance(result, dict) or result.get('Success') is False or
+                    not isinstance(result.get('incidents'), list) or
+                    any(not isinstance(item, dict) for item in result['incidents'])):
+                raise ValueError()
+        except urllib.error.HTTPError as exc:
+            # Never include request URL, response body, identity or token, even
+            # in chained exception tracebacks. Redirects are refused, not followed.
+            raise APIError(f'Case listing: HTTP {exc.code}.') from None
+        except (OSError, ValueError, urllib.error.URLError, RecursionError):
+            raise APIError('Case listing failed or returned an invalid response.') from None
+        return result
 
     def contact(self, token: Any, reporter: Any) -> Any:
         contact = dict(reporter, Token=token)
