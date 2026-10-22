@@ -271,3 +271,5 @@ schedule, case verification or filing is performed. See [MONTHLY.md](docs/MONTHL
 for the CSV schema, counting limits and review requirement.
 
 Historical regression coverage: [batch 1 audit](docs/HISTORICAL-REGRESSIONS.md).
+
+CI test/coverage results appear in [GitHub job summaries](docs/CI-TEST-SUMMARIES.md).

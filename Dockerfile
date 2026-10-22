@@ -15,6 +15,7 @@ COPY --from=build /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*.whl "Pillow>=11.3,<13" "pyproj>=3.6,<4" "filelock>=3.13,<4"
 COPY sample.json ./sample.json
 COPY tests ./tests
+COPY scripts ./scripts
 COPY docs ./docs
 RUN python -m unittest discover -s tests -v
 

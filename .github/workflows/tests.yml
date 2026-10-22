@@ -25,7 +25,11 @@ jobs:
       - name: Install package
         run: python -m pip install ".[api]"
       - name: Run unit and CLI tests
-        run: python -m unittest discover -s tests -v
+        run: python scripts/ci_test_report.py run --start tests --output test-results.json
+
+      - name: Publish test summary
+        if: ${{ always() }}
+        run: python scripts/ci_test_report.py summary --metrics test-results.json
 
   coverage:
     name: Coverage report
@@ -40,10 +44,16 @@ jobs:
         run: python -m pip install ".[api]" coverage
       - name: Measure coverage
         run: |
-          python -m coverage run --branch --source=src/parking_report -m unittest discover -s tests
+          status=0
+          python -m coverage run --branch --source=src/parking_report scripts/ci_test_report.py run --start tests --output test-results.json || status=$?
+          python -m coverage json -o coverage.json
           python -m coverage report --format=markdown > coverage.md
           python -m coverage html
           python -m coverage report | tail -1
+          exit "$status"
+      - name: Publish test summary
+        if: ${{ always() }}
+        run: python scripts/ci_test_report.py summary --metrics test-results.json --coverage coverage.json
       - name: Upload report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
