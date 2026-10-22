@@ -34,3 +34,27 @@ contain no secrets: tests should use synthetic values and safe source names.
 Normal job logs retain unittest's existing output and access controls. Six
 synthetic test methods verify category accounting, failure propagation, safe
 reasons, ordering and escaping. No live data is added to public summaries.
+
+## Nested assertion detail
+
+Each test has its own collapsed section. The static source plan lists call names,
+relative lines and argument AST shapes; literal input values are never copied.
+This is explicitly a plan, not proof every branch ran. Runtime wrapping of this
+test instance's unittest assertion methods records the observed method, inputs,
+expected/actual for supported methods, and whether the call returned or raised.
+Original methods are restored afterward. Internal nested assertions are deduplicated.
+
+Strings, arbitrary objects, containers and large numbers are withheld without
+calling repr/str on them. Only None, bool and small finite numeric values appear.
+Context-manager assertions report that the context was created; the final test
+status is the verdict. Plain Python assert, assertions hidden in external helpers,
+mock-call assertions and setup failure may have no observed details. Missing data
+is shown as not captured, not fabricated. The report is therefore a useful
+privacy-limited execution view, not a complete trace of every variable or branch.
+
+Skipped tests include a plain-language explanation and an alternate job only
+where the route is verified: workflow-source tests excluded by Docker run in full
+checkout Python/coverage jobs; missing API extras are installed by those jobs.
+Unknown skip reasons explicitly say no alternate execution route was verified.
+No browser/Playwright job is invented. Five added tests cover observation,
+restoration, privacy, static plans and skip-route explanations.
