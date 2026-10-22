@@ -25,7 +25,7 @@ class Synthetic(unittest.TestCase):
  def test_pass(self): pass
  def test_fail(self): self.fail('PRIVATE_MARKER')
  def test_error(self): raise ValueError('PRIVATE_MARKER')
- @unittest.skip('PRIVATE_MARKER')
+ @unittest.skip('Optional backend unavailable')
  def test_skip(self): pass
  @unittest.expectedFailure
  def test_expected(self): self.fail('PRIVATE_MARKER')
@@ -37,13 +37,17 @@ class Synthetic(unittest.TestCase):
                                      '--output', str(output)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 1)
             metrics = json.loads(output.read_text())
+            details = metrics.pop('details')
+            self.assertEqual(len(details), 6)
             self.assertEqual(metrics, {'tests': 6, 'passed': 1, 'failures': 1, 'errors': 1,
                                       'skipped': 1, 'expected_failures': 1,
                                       'unexpected_successes': 1, 'success': False})
             text = c.summary(output)
             self.assertIn('FAIL', text)
             self.assertNotIn('PRIVATE_MARKER', text)
-            self.assertNotIn('test_synthetic', text)
+            self.assertIn('test_synthetic', text)
+            self.assertIn('Per-test results', text)
+            self.assertLess(text.index('| failed |'), text.index('| passed |'))
 
     def test_success_and_import_error_counts(self):
         for source, success in [('import unittest\nclass T(unittest.TestCase):\n def test_ok(self): pass\n', True),
@@ -87,6 +91,15 @@ class Synthetic(unittest.TestCase):
                 path.write_text(content)
                 self.assertIn('unavailable',c.summary(path))
                 self.assertNotIn('secret',c.summary(path))
+
+    def test_per_test_reasons_redacted_and_markup_escaped(self):
+        text = c.safe_text('<script>alert(1)</script> plate 12345678 user@example.test token=abc123 /private/photo.jpg')
+        self.assertNotIn('<script>', text)
+        self.assertNotIn('12345678', text)
+        self.assertNotIn('user@example.test', text)
+        self.assertNotIn('abc123', text)
+        self.assertNotIn('/private/photo.jpg', text)
+        self.assertEqual(c.safe_text('Optional GPU not available'), 'Optional GPU not available')
 
     def test_workflow_always_publishes_summary_and_preserves_coverage_failure(self):
         path = ROOT/'.github/workflows/tests.yml'

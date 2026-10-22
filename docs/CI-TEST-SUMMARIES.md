@@ -18,3 +18,19 @@ and expected-failure accounting, preserved exit status, coverage parsing and
 summary append behavior. Docker remains a build/smoke result, not an invented
 unittest count. If a runner never starts (billing restriction), no in-job script
 can produce a summary. Hosted job status remains the source of truth.
+
+## Per-test detail follow-up
+
+A collapsible list now shows each source test ID, its docstring (or method name),
+status and safe reason. Failures/errors/unexpected successes and skips appear
+first. Failure type is shown, assertion bodies/tracebacks remain in existing job
+logs. Skip reasons are included with email/long-number/path/credential-pattern
+redaction. HTML is escaped. Subtest parameter values are omitted. This is a
+source-name explanation, not an invented natural-language claim about coverage.
+
+The in-run metrics file contains sanitized details but is not uploaded to any
+public artifact. This redaction is defense in depth, not proof arbitrary messages
+contain no secrets: tests should use synthetic values and safe source names.
+Normal job logs retain unittest's existing output and access controls. Six
+synthetic test methods verify category accounting, failure propagation, safe
+reasons, ordering and escaping. No live data is added to public summaries.
