@@ -273,6 +273,48 @@ class Municipality:
             raise APIError('Case listing failed or returned an invalid response.') from None
         return result
 
+    def case_files(self, token: str, reporter: dict[str, Any], *, case_id: str,
+                   from_date: str) -> list[bytes]:
+        """Read an owned incident's attachment bytes, never a guessed file URL.
+
+        The established app route returns ALL files in one GET per case. First
+        verify exact incident membership using a fresh own-reporter listing.
+        Filenames/URLs are deliberately not exported or followed.
+        """
+        if not isinstance(case_id, str) or not re.fullmatch(
+                r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', case_id):
+            raise InputError('Supply a municipal incident UUID from the own-case listing.')
+        own = self.list_cases(token, reporter, from_date=from_date)['incidents']
+        matches = [item for item in own if isinstance(item.get('caseId'), str)
+                   and item['caseId'].lower() == case_id.lower()]
+        if len(matches) != 1:
+            raise InputError('Case is not uniquely present in the configured reporter listing.')
+        endpoint = 'GetCaseFiles/' + urllib.parse.quote(token, safe='') + '/' + case_id
+        request = urllib.request.Request(BASE + endpoint, method='GET', headers={
+            'Ocp-Apim-Subscription-Key': self.credentials['subscription_key'],
+            'Content-Type': 'text/plain', 'User-Agent': 'App 106'})
+        try:
+            with urllib.request.build_opener(NoRedirect()).open(request, timeout=45) as response:
+                raw = response.read(32 * 1024 * 1024 + 1)
+            if len(raw) > 32 * 1024 * 1024:
+                raise ValueError()
+            data = json.loads(raw)
+            if not isinstance(data, list) or len(data) > 20:
+                raise ValueError()
+            files = []
+            for item in data:
+                if not isinstance(item, dict) or not isinstance(item.get('Content'), str):
+                    raise ValueError()
+                content = base64.b64decode(item['Content'], validate=True)
+                if not content or len(content) > 20 * 1024 * 1024:
+                    raise ValueError()
+                files.append(content)
+        except urllib.error.HTTPError as exc:
+            raise APIError(f'Case attachments: HTTP {exc.code}.') from None
+        except (OSError, ValueError, urllib.error.URLError, RecursionError):
+            raise APIError('Case attachments failed or returned an invalid response.') from None
+        return files
+
     def contact(self, token: Any, reporter: Any) -> Any:
         contact = dict(reporter, Token=token)
         response = self.request('createupdatecontact', dict(contact, SignUpByApp=True))

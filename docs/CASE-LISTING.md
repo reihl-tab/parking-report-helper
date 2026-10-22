@@ -36,3 +36,7 @@ Use records to reconcile, not to refile: match exact description/plate/address/d
 and preserve ambiguity, delayed creation, duplicate cases and unknowns. A web
 case ID is not a municipal reference. A closed status is not proof of enforcement.
 The method never changes ledger entries or sends reminders automatically.
+
+Owned-case attachment reads are documented in
+[CASE-ATTACHMENTS.md](CASE-ATTACHMENTS.md). They first check membership in this
+listing and then read the case's complete attachment batch once.
