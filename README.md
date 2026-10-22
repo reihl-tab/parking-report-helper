@@ -269,3 +269,5 @@ IDs/references or invalid dates stop the draft. Plates and registry details are
 omitted. Use a private destination, never public logs/artifacts. No email,
 schedule, case verification or filing is performed. See [MONTHLY.md](docs/MONTHLY.md)
 for the CSV schema, counting limits and review requirement.
+
+Historical regression coverage: [batch 1 audit](docs/HISTORICAL-REGRESSIONS.md).
