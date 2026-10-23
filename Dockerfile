@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /
 ENV PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 COPY --from=build /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl "Pillow>=11.3,<13" "pyproj>=3.6,<4" "filelock>=3.13,<4"
+RUN pip install --no-cache-dir "$(ls /wheels/*.whl)[api]"
 COPY sample.json ./sample.json
 COPY tests ./tests
 COPY scripts ./scripts
@@ -35,7 +35,8 @@ CMD ["--help"]
 FROM runtime-base AS api
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir "Pillow>=11.3,<13" "pyproj>=3.6,<4" "filelock>=3.13,<4"
+COPY --from=build /wheels /wheels
+RUN pip install --no-cache-dir "$(ls /wheels/*.whl)[api]" && rm -rf /wheels
 USER app
 ENTRYPOINT ["parking-report-106"]
 
