@@ -1,4 +1,5 @@
 """Functional tests: the installed CLI run end to end on the shipped sample input."""
+
 import json
 import tempfile
 import unittest
@@ -43,11 +44,19 @@ class TestMunicipalityOutput(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.reporter = Path(self.tmp.name, "reporter.json")
-        self.reporter.write_text(json.dumps(REPORTER, ensure_ascii=False), encoding="utf-8")
+        self.reporter.write_text(
+            json.dumps(REPORTER, ensure_ascii=False), encoding="utf-8"
+        )
 
     def test_json_output_has_every_form_field_filled_from_the_right_source(self):
-        result = run_cli(str(SAMPLE), "--municipality", "jerusalem",
-                         "--reporter", str(self.reporter), "--json")
+        result = run_cli(
+            str(SAMPLE),
+            "--municipality",
+            "jerusalem",
+            "--reporter",
+            str(self.reporter),
+            "--json",
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         first = json.loads(result.stdout)[0]
         self.assertEqual(first["first_name"], "דנה")
@@ -59,8 +68,9 @@ class TestMunicipalityOutput(unittest.TestCase):
         self.assertEqual(first["phone2"], "")  # optional and not supplied
 
     def test_text_output_lists_fields_in_form_order_with_source_link(self):
-        result = run_cli(str(SAMPLE), "--municipality", "jerusalem",
-                         "--reporter", str(self.reporter))
+        result = run_cli(
+            str(SAMPLE), "--municipality", "jerusalem", "--reporter", str(self.reporter)
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("https://www.jerusalem.muni.il/he/contactus/106/", result.stdout)
         labels = ["שם פרטי", "שם משפחה", "אמצעי זיהוי", "מספר זיהוי", "תוכן הפנייה"]
@@ -76,13 +86,29 @@ class TestMunicipalityOutput(unittest.TestCase):
 
     def test_custom_config_file_replaces_the_bundled_one(self):
         config = Path(self.tmp.name, "city.json")
-        config.write_text(json.dumps({
-            "city": "עיר לדוגמה",
-            "fields": [
-                {"key": "city", "label": "עיר", "required": True, "source": "config"},
-                {"key": "description", "label": "תיאור", "required": True, "source": "report"},
-            ],
-        }, ensure_ascii=False), encoding="utf-8")
+        config.write_text(
+            json.dumps(
+                {
+                    "city": "עיר לדוגמה",
+                    "fields": [
+                        {
+                            "key": "city",
+                            "label": "עיר",
+                            "required": True,
+                            "source": "config",
+                        },
+                        {
+                            "key": "description",
+                            "label": "תיאור",
+                            "required": True,
+                            "source": "report",
+                        },
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
         result = run_cli(str(SAMPLE), "--municipality", str(config), "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(sorted(json.loads(result.stdout)[0]), ["city", "description"])
@@ -103,7 +129,11 @@ class TestOptionValidation(unittest.TestCase):
                 self.assertIn("requires --municipality", result.stderr)
 
     def test_removed_browser_flags_are_rejected(self):
-        for flag in (["--fill", "1"], ["--photo", "a.jpg"], ["--form-url", "https://example.invalid"]):
+        for flag in (
+            ["--fill", "1"],
+            ["--photo", "a.jpg"],
+            ["--form-url", "https://example.invalid"],
+        ):
             result = run_cli(str(SAMPLE), "--municipality", "jerusalem", *flag)
             self.assertEqual(result.returncode, 2)
             self.assertIn("unrecognized arguments", result.stderr)

@@ -89,7 +89,9 @@ def build_submissions(
     submissions = []
     for index, car in enumerate(cars, start=1):
         try:
-            submissions.append(build_submission(Car.from_mapping(car), config, reporter, with_photo))
+            submissions.append(
+                build_submission(Car.from_mapping(car), config, reporter, with_photo)
+            )
         except ValueError as error:
             raise ValueError(f"car {index}: {error}") from error
     return submissions

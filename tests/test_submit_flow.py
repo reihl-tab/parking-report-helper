@@ -1,4 +1,5 @@
 """End-to-end submission flow: recorded API responses through every submit() state transition."""
+
 from __future__ import annotations
 
 import base64
@@ -30,7 +31,11 @@ class FakeAPI:
         self.calls.append(("create", report.get("CaseSubjectCode")))
         if self.fail_create:
             raise ConnectionError("network dropped after create")
-        return {"CaseIdInCRM": "c-1", "WebCaseIdInCRM": "w-1", "CaseNumberInCRM": "2610-1"}
+        return {
+            "CaseIdInCRM": "c-1",
+            "WebCaseIdInCRM": "w-1",
+            "CaseNumberInCRM": "2610-1",
+        }
 
     def attach(self, token, case, jpeg, filename):
         self.calls.append(("attach", filename, base64.b64encode(jpeg).decode()))
@@ -101,11 +106,13 @@ class SubmitFlowTests(unittest.TestCase):
         class BadCreate(FakeAPI):
             def create(self, token, contact, report):
                 return {"Success": True}
+
         with TemporaryDirectory() as tmp, self.assertRaises(ReviewNeeded):
             self.run_submit(tmp, BadCreate())
 
     def test_concurrent_run_is_refused(self):
         from filelock import FileLock
+
         with TemporaryDirectory() as tmp:
             lock = FileLock(str(Path(tmp) / "fp-1.json") + ".lock")
             lock.acquire(timeout=1)

@@ -1,4 +1,5 @@
 """In-process coverage for cli.py and __main__.py (the functional tests run a subprocess, invisible to coverage)."""
+
 from __future__ import annotations
 
 import io
@@ -14,8 +15,14 @@ from parking_report import cli
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / "sample.json"
 INTAKE_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "intake"
-REPORTER = {"first_name": "דנה", "last_name": "לוי", "id_type": "תעודת זהות",
-            "id_number": "000000018", "phone": "0500000000", "email": "dana@example.com"}
+REPORTER = {
+    "first_name": "דנה",
+    "last_name": "לוי",
+    "id_type": "תעודת זהות",
+    "id_number": "000000018",
+    "phone": "0500000000",
+    "email": "dana@example.com",
+}
 
 
 class Out(io.StringIO):
@@ -38,7 +45,9 @@ class CliModuleTests(unittest.TestCase):
         self.assertIn("ירושלים", out)
 
     def test_cars_file_no_photo_and_name(self):
-        code, out, _ = run([str(SAMPLE), "--city", "ירושלים", "--name", "דנה", "--no-photo"])
+        code, out, _ = run(
+            [str(SAMPLE), "--city", "ירושלים", "--name", "דנה", "--no-photo"]
+        )
         self.assertEqual(code, 0)
         self.assertIn("דנה", out)
         self.assertNotIn("מצורפת תמונה", out)
@@ -47,12 +56,27 @@ class CliModuleTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             reporter = Path(tmp) / "reporter.json"
             reporter.write_text(json.dumps(REPORTER), encoding="utf-8")
-            code, out, _ = run([str(SAMPLE), "--municipality", "jerusalem",
-                                "--reporter", str(reporter)])
+            code, out, _ = run(
+                [
+                    str(SAMPLE),
+                    "--municipality",
+                    "jerusalem",
+                    "--reporter",
+                    str(reporter),
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertIn("# 1/", out)
-            code, out, _ = run([str(SAMPLE), "--municipality", "jerusalem",
-                                "--reporter", str(reporter), "--json"])
+            code, out, _ = run(
+                [
+                    str(SAMPLE),
+                    "--municipality",
+                    "jerusalem",
+                    "--reporter",
+                    str(reporter),
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             parsed = json.loads(out)
             self.assertIsInstance(parsed, list)
@@ -77,19 +101,29 @@ class CliModuleTests(unittest.TestCase):
             self.assertIn("error:", err)
 
     def test_parser_errors(self):
-        for argv in ([], [str(SAMPLE), "--intake", str(INTAKE_FIXTURE)],
-                     ["--drive-folder", "abc"], ["--drive-api", "http://x"],
-                     [str(SAMPLE), "--reporter", "r.json"], [str(SAMPLE), "--json"],
-                     ["--intake", str(INTAKE_FIXTURE), "--drive-api", "http://x"]):
+        for argv in (
+            [],
+            [str(SAMPLE), "--intake", str(INTAKE_FIXTURE)],
+            ["--drive-folder", "abc"],
+            ["--drive-api", "http://x"],
+            [str(SAMPLE), "--reporter", "r.json"],
+            [str(SAMPLE), "--json"],
+            ["--intake", str(INTAKE_FIXTURE), "--drive-api", "http://x"],
+        ):
             with self.subTest(argv=argv), self.assertRaises(SystemExit) as ctx:
                 cli.main(argv)
             self.assertEqual(ctx.exception.code, 2)
 
     def test_main_module_delegates(self):
         import runpy
-        with patch.object(sys, "exit") as mock_exit, \
-                patch.object(sys, "argv", ["parking_report", str(SAMPLE), "--city", "ירושלים"]), \
-                patch.object(sys, "stdout", Out()):
+
+        with (
+            patch.object(sys, "exit") as mock_exit,
+            patch.object(
+                sys, "argv", ["parking_report", str(SAMPLE), "--city", "ירושלים"]
+            ),
+            patch.object(sys, "stdout", Out()),
+        ):
             runpy.run_module("parking_report", run_name="__main__")
         mock_exit.assert_called_once_with(0)
 

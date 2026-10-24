@@ -1,4 +1,5 @@
 """Unit tests for report building and validation."""
+
 import unittest
 
 from parking_report import REQUIRED, Car, build_report, build_reports, format_datetime
@@ -41,7 +42,6 @@ class TestValidation(unittest.TestCase):
         original = record.copy()
         self.assertIn("00-000-00", build_report(record))
         self.assertEqual(record, original)
-
 
     def test_car_dataclass_accepts_instances(self):
         car = Car.from_mapping(CAR)

@@ -1,4 +1,5 @@
 """Tests for per-municipality config and form field values."""
+
 import json
 import os
 from pathlib import Path
@@ -17,8 +18,12 @@ from parking_report.municipality import (
 
 CAR = {"plate": "00-000-00", "street": "Example 12", "datetime": "2026-01-02 03:04"}
 REPORTER = {
-    "first_name": "A", "last_name": "B", "id_type": "תעודת זהות",
-    "id_number": "000000000", "phone": "0500000000", "email": "a@example.com",
+    "first_name": "A",
+    "last_name": "B",
+    "id_type": "תעודת זהות",
+    "id_number": "000000000",
+    "phone": "0500000000",
+    "email": "a@example.com",
 }
 
 
@@ -38,9 +43,22 @@ class TestMunicipality(unittest.TestCase):
     def test_config_from_path(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "c.json"
-            path.write_text(json.dumps({"fields": [
-                {"key": "city", "label": "City", "source": "config", "required": True}
-            ], "city": "X"}), encoding="utf-8")
+            path.write_text(
+                json.dumps(
+                    {
+                        "fields": [
+                            {
+                                "key": "city",
+                                "label": "City",
+                                "source": "config",
+                                "required": True,
+                            }
+                        ],
+                        "city": "X",
+                    }
+                ),
+                encoding="utf-8",
+            )
             rows = build_submission(CAR, load_config(str(path)))
         self.assertEqual(submission_dict(rows), {"city": "X"})
 
@@ -81,7 +99,11 @@ class TestMunicipalityCLI(unittest.TestCase):
                 rep.write_text(json.dumps(reporter), encoding="utf-8")
                 args += ["--reporter", str(rep)]
             return subprocess.run(
-                args, capture_output=True, text=True, encoding="utf-8", timeout=10,
+                args,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=10,
                 env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )
 
@@ -93,7 +115,9 @@ class TestMunicipalityCLI(unittest.TestCase):
         self.assertIn("שם פרטי: A", result.stdout)
 
     def test_json_output(self):
-        result = self.run_cli([CAR, CAR], REPORTER, "--municipality", "jerusalem", "--json")
+        result = self.run_cli(
+            [CAR, CAR], REPORTER, "--municipality", "jerusalem", "--json"
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         data = json.loads(result.stdout)
         self.assertEqual(len(data), 2)

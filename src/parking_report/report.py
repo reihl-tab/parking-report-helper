@@ -40,7 +40,11 @@ class Car:
         kind = data.get("draft_kind", "parking")
         if kind not in {"parking", "municipal_issue"}:
             raise ValueError("unknown draft kind")
-        required = REQUIRED if kind == "parking" else ("street", "datetime", "notes", "event_type")
+        required = (
+            REQUIRED
+            if kind == "parking"
+            else ("street", "datetime", "notes", "event_type")
+        )
         missing = [
             key
             for key in required
@@ -72,14 +76,23 @@ def build_report(
     if city:
         place += f", {city}"
     if record.draft_kind == "municipal_issue":
-        parts = [f"שלום, אני מדווח על מפגע: {record.notes}.",
-                 f"מיקום: {place}.", f"תאריך ושעה: {format_datetime(record.datetime)}."]
+        parts = [
+            f"שלום, אני מדווח על מפגע: {record.notes}.",
+            f"מיקום: {place}.",
+            f"תאריך ושעה: {format_datetime(record.datetime)}.",
+        ]
         if with_photo:
             parts.append("מצורפת תמונה.")
-        parts.extend(["אבקש לטפל במפגע ולעדכן אותי במספר הפנייה.",
-                      "תודה" + (f", {name}" if name else "")])
+        parts.extend(
+            [
+                "אבקש לטפל במפגע ולעדכן אותי במספר הפנייה.",
+                "תודה" + (f", {name}" if name else ""),
+            ]
+        )
         return " ".join(parts)
-    plate_text = f"{record.plate} ({record.car_type})" if record.car_type else record.plate
+    plate_text = (
+        f"{record.plate} ({record.car_type})" if record.car_type else record.plate
+    )
     parts = [
         f"שלום, אני מדווח על רכב שחונה {record.notes or 'בחניה אסורה'}.",
         f"מיקום: {place}.",

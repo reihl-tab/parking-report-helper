@@ -1,4 +1,5 @@
 """Intake: report folders (report.json + photo) to cars, locally and via a fake Drive server."""
+
 import http.server
 import json
 import shutil
@@ -30,7 +31,9 @@ class TestReadIntake(unittest.TestCase):
         self.assertEqual(reasons["2026-10-05_1200_ef56"], "plate is missing")
 
     def test_missing_house_number_requires_clarification(self):
-        record = json.loads((INTAKE / "2026-10-05_1005_ab12" / "report.json").read_text())
+        record = json.loads(
+            (INTAKE / "2026-10-05_1005_ab12" / "report.json").read_text()
+        )
         record["address"]["house_number"] = ""
         with self.assertRaisesRegex(ValueError, "address.house_number is missing"):
             record_to_car(record)
@@ -39,7 +42,9 @@ class TestReadIntake(unittest.TestCase):
         self.assertIn("40", record_to_car(record)["street"])
 
     def test_location_description_is_in_draft_without_coordinates(self):
-        record = json.loads((INTAKE / "2026-10-05_1005_ab12" / "report.json").read_text())
+        record = json.loads(
+            (INTAKE / "2026-10-05_1005_ab12" / "report.json").read_text()
+        )
         record["location_description"] = "ליד כניסת הבניין על ריצוף האבן"
         car = record_to_car(record)
         self.assertIn(record["location_description"], car["notes"])
@@ -48,11 +53,16 @@ class TestReadIntake(unittest.TestCase):
         self.assertIn("קירוב", car["notes"])
 
     def test_registry_text_is_added_to_parking_reports(self):
-        record = json.loads((INTAKE / "2026-10-05_1005_ab12" / "report.json").read_text())
+        record = json.loads(
+            (INTAKE / "2026-10-05_1005_ab12" / "report.json").read_text()
+        )
         self.assertNotIn("registry_text", record_to_car(record))
-        record["registry"] = {"plate": "1234567", "checked_on": "2026-10-08",
-                              "vehicle_lookup": "not_found_in_dataset",
-                              "disability_lookup": "not_found_in_dataset"}
+        record["registry"] = {
+            "plate": "1234567",
+            "checked_on": "2026-10-08",
+            "vehicle_lookup": "not_found_in_dataset",
+            "disability_lookup": "not_found_in_dataset",
+        }
         car = record_to_car(record)
         self.assertNotIn("רישיון", car["registry_text"])
         self.assertIn("לא נמצא לרכב תג נכה", car["registry_text"])
@@ -89,8 +99,18 @@ class TestIntakeCli(unittest.TestCase):
         self.assertIn("00-000-00 (קופרה)", r.stdout)
 
     def test_usage_errors(self):
-        for args in (["--intake", str(INTAKE), "sample.json"], [], ["--drive-folder", "abcde12345"],
-                     ["sample.json", "--intake", str(INTAKE), "--drive-api", "http://localhost:1"]):
+        for args in (
+            ["--intake", str(INTAKE), "sample.json"],
+            [],
+            ["--drive-folder", "abcde12345"],
+            [
+                "sample.json",
+                "--intake",
+                str(INTAKE),
+                "--drive-api",
+                "http://localhost:1",
+            ],
+        ):
             self.assertEqual(run_cli(*args).returncode, 2, args)
 
     def test_missing_token_is_clear_error(self):
@@ -111,17 +131,41 @@ class FakeDrive:
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
-                drive.requests.append((self.command, self.path, self.headers.get("Authorization", "")))
+                drive.requests.append(
+                    (self.command, self.path, self.headers.get("Authorization", ""))
+                )
                 url = urllib.parse.urlparse(self.path)
                 query = urllib.parse.parse_qs(url.query)
                 if url.path == "/files" and "'root1' in parents" in query["q"][0]:
-                    body = {"files": [{"id": "sub12345", "name": "2026-10-05_1005_ab12",
-                                       "mimeType": "application/vnd.google-apps.folder"}]}
+                    body = {
+                        "files": [
+                            {
+                                "id": "sub12345",
+                                "name": "2026-10-05_1005_ab12",
+                                "mimeType": "application/vnd.google-apps.folder",
+                            }
+                        ]
+                    }
                 elif url.path == "/files" and "'sub12345' in parents" in query["q"][0]:
-                    body = {"files": [
-                        {"id": "file1", "name": "report.json", "mimeType": "application/json"},
-                        {"id": "file2", "name": "photo.jpg", "mimeType": "image/jpeg"},
-                        {"id": "file3", "name": "../evil.sh", "mimeType": "text/plain"}]}
+                    body = {
+                        "files": [
+                            {
+                                "id": "file1",
+                                "name": "report.json",
+                                "mimeType": "application/json",
+                            },
+                            {
+                                "id": "file2",
+                                "name": "photo.jpg",
+                                "mimeType": "image/jpeg",
+                            },
+                            {
+                                "id": "file3",
+                                "name": "../evil.sh",
+                                "mimeType": "text/plain",
+                            },
+                        ]
+                    }
                 elif url.path == "/files/file1":
                     return self._send(record)
                 elif url.path == "/files/file2":
@@ -153,42 +197,98 @@ class TestDrive(unittest.TestCase):
         self.addCleanup(drive.close)
         with tempfile.TemporaryDirectory() as d:
             download_folder("root1", d, base=drive.url, token="tok")
-            files = sorted(p.relative_to(d).as_posix() for p in Path(d).rglob("*") if p.is_file())
-            self.assertEqual(files, ["2026-10-05_1005_ab12/photo.jpg", "2026-10-05_1005_ab12/report.json"])
+            files = sorted(
+                p.relative_to(d).as_posix() for p in Path(d).rglob("*") if p.is_file()
+            )
+            self.assertEqual(
+                files,
+                ["2026-10-05_1005_ab12/photo.jpg", "2026-10-05_1005_ab12/report.json"],
+            )
             self.assertEqual(len(read_intake(d).cars), 1)
-        self.assertTrue(all(m == "GET" and a == "Bearer tok" for m, _, a in drive.requests))
+        self.assertTrue(
+            all(m == "GET" and a == "Bearer tok" for m, _, a in drive.requests)
+        )
 
     def test_cli_with_drive_folder_and_error_not_retried(self):
         drive = FakeDrive()
         self.addCleanup(drive.close)
         with tempfile.TemporaryDirectory() as d:
-            r = run_cli("--intake", d, "--drive-folder", "root1", "--drive-api", drive.url,
-                        "--municipality", "jerusalem")
+            r = run_cli(
+                "--intake",
+                d,
+                "--drive-folder",
+                "root1",
+                "--drive-api",
+                drive.url,
+                "--municipality",
+                "jerusalem",
+            )
             self.assertEqual(r.returncode, 1)  # no token in the environment
         env_ok = {"PARKING_DRIVE_TOKEN": "tok"}
         import os, subprocess, sys
         from support import ROOT
-        env = {**os.environ, **env_ok, "PYTHONIOENCODING": "utf-8",
-               "PYTHONPATH": str(ROOT / "src")}
+
+        env = {
+            **os.environ,
+            **env_ok,
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONPATH": str(ROOT / "src"),
+        }
         with tempfile.TemporaryDirectory() as d:
             ok = subprocess.run(
-                [sys.executable, "-m", "parking_report", "--intake", d, "--drive-folder", "root1",
-                 "--drive-api", drive.url, "--municipality", "jerusalem"],
-                capture_output=True, text=True, encoding="utf-8", env=env, timeout=30)
+                [
+                    sys.executable,
+                    "-m",
+                    "parking_report",
+                    "--intake",
+                    d,
+                    "--drive-folder",
+                    "root1",
+                    "--drive-api",
+                    drive.url,
+                    "--municipality",
+                    "jerusalem",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                env=env,
+                timeout=30,
+            )
             self.assertEqual(ok.returncode, 0, ok.stderr)
             self.assertIn("התנופה", ok.stdout)
         before = len(drive.requests)
         with tempfile.TemporaryDirectory() as d:
             bad = subprocess.run(
-                [sys.executable, "-m", "parking_report", "--intake", d, "--drive-folder", "missing1",
-                 "--drive-api", drive.url],
-                capture_output=True, text=True, encoding="utf-8", env=env, timeout=30)
+                [
+                    sys.executable,
+                    "-m",
+                    "parking_report",
+                    "--intake",
+                    d,
+                    "--drive-folder",
+                    "missing1",
+                    "--drive-api",
+                    drive.url,
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                env=env,
+                timeout=30,
+            )
         self.assertEqual(bad.returncode, 1)
         self.assertEqual(len(drive.requests) - before, 1)
 
     def test_api_host_allowlist(self):
-        self.assertEqual(check_api("https://www.googleapis.com/drive/v3"), "https://www.googleapis.com/drive/v3")
-        for url in ("https://evil.example/drive/v3", "http://www.googleapis.com/drive/v3"):
+        self.assertEqual(
+            check_api("https://www.googleapis.com/drive/v3"),
+            "https://www.googleapis.com/drive/v3",
+        )
+        for url in (
+            "https://evil.example/drive/v3",
+            "http://www.googleapis.com/drive/v3",
+        ):
             with self.assertRaises(ValueError):
                 check_api(url)
 

@@ -1,12 +1,18 @@
 """Report content tests."""
+
 import json
 import os
 import unittest
 
 import parking_report as pr
 
-CAR = {"plate": "00-000-00", "car_type": "קופרה", "street": "הדוגמה 1",
-       "datetime": "2026-10-05 06:38", "notes": "על המדרכה"}
+CAR = {
+    "plate": "00-000-00",
+    "car_type": "קופרה",
+    "street": "הדוגמה 1",
+    "datetime": "2026-10-05 06:38",
+    "notes": "על המדרכה",
+}
 
 
 class TestReport(unittest.TestCase):
@@ -20,8 +26,14 @@ class TestReport(unittest.TestCase):
 
     def test_report_contents(self):
         t = pr.build_report(CAR, city="ירושלים", name="דנה")
-        for s in ("00-000-00 (קופרה)", "ברחוב הדוגמה 1, ירושלים",
-                  "5.10.2026, 06:38", "על המדרכה", "מצורפת תמונה", "תודה, דנה"):
+        for s in (
+            "00-000-00 (קופרה)",
+            "ברחוב הדוגמה 1, ירושלים",
+            "5.10.2026, 06:38",
+            "על המדרכה",
+            "מצורפת תמונה",
+            "תודה, דנה",
+        ):
             self.assertIn(s, t)
 
     def test_optional_fields(self):
@@ -36,7 +48,9 @@ class TestReport(unittest.TestCase):
             pr.build_report({"plate": "00-000-00"})
 
     def test_sample_file(self):
-        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sample.json")
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sample.json"
+        )
         with open(path, encoding="utf-8") as f:
             reports = pr.build_reports(json.load(f))
         self.assertEqual(len(reports), 2)
@@ -49,4 +63,3 @@ class TestReport(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

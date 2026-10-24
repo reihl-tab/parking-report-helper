@@ -1,4 +1,5 @@
 """In-process coverage of api_cli.main: argument validation, dry run, and blocked paths."""
+
 from __future__ import annotations
 
 import io
@@ -13,9 +14,13 @@ from PIL import Image
 
 from parking_report import api_cli
 
-ENV = {"PARKING_REPORTER_FIRST_NAME": "דנה", "PARKING_REPORTER_LAST_NAME": "לוי",
-       "PARKING_REPORTER_PHONE": "0500000000", "PARKING_REPORTER_ID_NUMBER": "000000018",
-       "PARKING_REPORTER_EMAIL": "dana@example.com"}
+ENV = {
+    "PARKING_REPORTER_FIRST_NAME": "דנה",
+    "PARKING_REPORTER_LAST_NAME": "לוי",
+    "PARKING_REPORTER_PHONE": "0500000000",
+    "PARKING_REPORTER_ID_NUMBER": "000000018",
+    "PARKING_REPORTER_EMAIL": "dana@example.com",
+}
 
 
 class Out(io.StringIO):
@@ -26,18 +31,36 @@ class Out(io.StringIO):
 def make_folder(tmp):
     folder = Path(tmp)
     Image.new("RGB", (10, 10), "white").save(folder / "photo.jpg")
-    (folder / "report.json").write_text(json.dumps({
-        "schema_version": 1, "status": "ready", "photo": "photo.jpg",
-        "captured_at": "2026-01-01 12:00",
-        "address": {"street": "רחוב לדוגמה", "house_number": "1"},
-        "violation": {"category": "graffiti", "description": "גרפיטי על קיר"},
-        "municipal_subject": {"code": "1072", "owner_choice": True, "event_type": "graffiti"},
-        "approved_description": "גרפיטי על קיר ברחוב לדוגמה 1. אבקש לטפל במפגע."}),
-        encoding="utf-8")
+    (folder / "report.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "status": "ready",
+                "photo": "photo.jpg",
+                "captured_at": "2026-01-01 12:00",
+                "address": {"street": "רחוב לדוגמה", "house_number": "1"},
+                "violation": {"category": "graffiti", "description": "גרפיטי על קיר"},
+                "municipal_subject": {
+                    "code": "1072",
+                    "owner_choice": True,
+                    "event_type": "graffiti",
+                },
+                "approved_description": "גרפיטי על קיר ברחוב לדוגמה 1. אבקש לטפל במפגע.",
+            }
+        ),
+        encoding="utf-8",
+    )
     addresses = folder / "addresses.json"
-    addresses.write_text(json.dumps({"version": 1,
-        "streets": [{"StreetCode": "fake", "StreetName": "רחוב לדוגמה"}],
-        "addresses": [[31.77, 35.21, "1", "רחוב לדוגמה"]]}), encoding="utf-8")
+    addresses.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "streets": [{"StreetCode": "fake", "StreetName": "רחוב לדוגמה"}],
+                "addresses": [[31.77, 35.21, "1", "רחוב לדוגמה"]],
+            }
+        ),
+        encoding="utf-8",
+    )
     return folder, addresses
 
 
@@ -70,7 +93,9 @@ class ApiCliMainTests(unittest.TestCase):
     def test_retry_photo_without_submit_is_blocked(self):
         with TemporaryDirectory() as tmp:
             folder, addresses = make_folder(tmp)
-            code, out = run([str(folder), "--addresses", str(addresses), "--retry-photo"])
+            code, out = run(
+                [str(folder), "--addresses", str(addresses), "--retry-photo"]
+            )
             self.assertEqual(code, 4)
             self.assertEqual(json.loads(out)["status"], "blocked")
 
@@ -92,7 +117,9 @@ class ApiCliMainTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             folder, addresses = make_folder(tmp)
             record = json.loads((folder / "report.json").read_text(encoding="utf-8"))
-            record["approved_description"] = "גרפיטי על קיר ברחוב".encode("utf-8").decode("latin-1")
+            record["approved_description"] = "גרפיטי על קיר ברחוב".encode(
+                "utf-8"
+            ).decode("latin-1")
             (folder / "report.json").write_text(json.dumps(record), encoding="utf-8")
             code, out = run([str(folder), "--addresses", str(addresses)])
             self.assertEqual(code, 4)

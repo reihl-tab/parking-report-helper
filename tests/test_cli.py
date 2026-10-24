@@ -1,4 +1,5 @@
 """End-to-end tests of the real CLI using isolated temporary files."""
+
 import json
 import os
 from pathlib import Path
@@ -17,13 +18,22 @@ class TestCLI(unittest.TestCase):
             path.write_text(content, encoding="utf-8")
             return subprocess.run(
                 [sys.executable, "-m", "parking_report", str(path), *options],
-                capture_output=True, text=True, encoding="utf-8", timeout=10,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=10,
                 env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )
 
     def test_success_with_options(self):
-        result = self.run_cli(json.dumps([CAR]), "--city", "Example City",
-                              "--name", "Example Reporter", "--no-photo")
+        result = self.run_cli(
+            json.dumps([CAR]),
+            "--city",
+            "Example City",
+            "--name",
+            "Example Reporter",
+            "--no-photo",
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stderr, "")
         self.assertIn("Example City", result.stdout)
@@ -41,8 +51,13 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), "")
 
     def test_invalid_inputs_fail_cleanly(self):
-        for content in ("{bad json", "{}", "[null]", '[{"plate": null}]',
-                        json.dumps([CAR, {**CAR, "datetime": "invalid"}])):
+        for content in (
+            "{bad json",
+            "{}",
+            "[null]",
+            '[{"plate": null}]',
+            json.dumps([CAR, {**CAR, "datetime": "invalid"}]),
+        ):
             with self.subTest(content=content):
                 result = self.run_cli(content)
                 self.assertEqual(result.returncode, 1)
@@ -53,16 +68,27 @@ class TestCLI(unittest.TestCase):
     def test_missing_file_fails_cleanly(self):
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run(
-                [sys.executable, "-m", "parking_report", str(Path(directory) / "missing.json")],
-                capture_output=True, text=True, timeout=10,
+                [
+                    sys.executable,
+                    "-m",
+                    "parking_report",
+                    str(Path(directory) / "missing.json"),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
         self.assertEqual(result.returncode, 1)
         self.assertIn("error:", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_help(self):
-        result = subprocess.run([sys.executable, "-m", "parking_report", "--help"],
-                                capture_output=True, text=True, timeout=10)
+        result = subprocess.run(
+            [sys.executable, "-m", "parking_report", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
         self.assertEqual(result.returncode, 0)
         self.assertIn("--no-photo", result.stdout)
 

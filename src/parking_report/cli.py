@@ -50,7 +50,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON file with reporter details for the form (keep it outside the repo)",
     )
     parser.add_argument(
-        "--json", action="store_true", help="with --municipality, print JSON instead of text"
+        "--json",
+        action="store_true",
+        help="with --municipality, print JSON instead of text",
     )
     return parser
 
@@ -71,7 +73,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--drive-api requires --drive-folder")
     if not args.municipality:
         for flag, used in (
-            ("--reporter", args.reporter), ("--json", args.json),
+            ("--reporter", args.reporter),
+            ("--json", args.json),
         ):
             if used:
                 parser.error(f"{flag} requires --municipality")
@@ -100,7 +103,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             subs = build_submissions(cars, config, reporter, not args.no_photo)
             if args.json:
                 output = json.dumps(
-                    [submission_dict(rows) for rows in subs], ensure_ascii=False, indent=2
+                    [submission_dict(rows) for rows in subs],
+                    ensure_ascii=False,
+                    indent=2,
                 )
             else:
                 url = config.get("channel", {}).get("url", "")

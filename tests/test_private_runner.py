@@ -1,6 +1,8 @@
 """Static privacy guards for the manual workflow template."""
+
 import unittest
 from pathlib import Path
+
 
 class TestPrivateRunner(unittest.TestCase):
     def test_no_automatic_events_credentials_or_submission(self):
