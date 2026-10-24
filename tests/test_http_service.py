@@ -4,11 +4,12 @@ import io
 import json
 import threading
 import unittest
-import urllib.request
 import urllib.error
+import urllib.request
 from wsgiref.simple_server import make_server
-from parking_report.http_service import Service, QuietHandler
+
 from parking_report.api106 import APIError
+from parking_report.http_service import QuietHandler, Service
 
 TOKEN = "synthetic-only-token-0000000000000000"
 ENV = {

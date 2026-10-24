@@ -117,9 +117,7 @@ class ApiCliMainTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             folder, addresses = make_folder(tmp)
             record = json.loads((folder / "report.json").read_text(encoding="utf-8"))
-            record["approved_description"] = "גרפיטי על קיר ברחוב".encode(
-                "utf-8"
-            ).decode("latin-1")
+            record["approved_description"] = "גרפיטי על קיר ברחוב".encode().decode("latin-1")
             (folder / "report.json").write_text(json.dumps(record), encoding="utf-8")
             code, out = run([str(folder), "--addresses", str(addresses)])
             self.assertEqual(code, 4)

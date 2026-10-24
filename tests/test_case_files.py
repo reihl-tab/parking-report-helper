@@ -8,8 +8,9 @@ import unittest
 import urllib.error
 from unittest.mock import patch
 
-from parking_report.api106 import APIError, InputError, Municipality, NoRedirect
 from test_case_listing import CREDS, REPORTER, TOKEN
+
+from parking_report.api106 import APIError, InputError, Municipality, NoRedirect
 
 CASE = "11111111-1111-4111-8111-111111111111"
 

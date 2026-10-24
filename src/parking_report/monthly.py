@@ -7,13 +7,13 @@ Output can contain private references and must stay out of public logs/artifacts
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 import csv
-from datetime import date
-from pathlib import Path
 import re
 import sys
-from typing import Iterable, Mapping
+from collections import Counter
+from collections.abc import Iterable, Mapping
+from datetime import date
+from pathlib import Path
 
 REQUIRED = {
     "folder_id",

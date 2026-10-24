@@ -2,7 +2,6 @@
 
 import http.server
 import json
-import shutil
 import tempfile
 import threading
 import unittest
@@ -225,7 +224,10 @@ class TestDrive(unittest.TestCase):
             )
             self.assertEqual(r.returncode, 1)  # no token in the environment
         env_ok = {"PARKING_DRIVE_TOKEN": "tok"}
-        import os, subprocess, sys
+        import os
+        import subprocess
+        import sys
+
         from support import ROOT
 
         env = {

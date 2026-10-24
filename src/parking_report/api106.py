@@ -1,27 +1,27 @@
 """Jerusalem API transport adapted from the user-supplied client. No embedded secrets."""
 
 from __future__ import annotations
-import argparse
+
 import base64
 import hashlib
 import io
 import json
 import math
 import os
-from pathlib import Path
 import re
-import sys
+import subprocess
 import tempfile
 import unicodedata
 import urllib.error
-import urllib.request
 import urllib.parse
-from datetime import date
+import urllib.request
 import uuid
 import warnings
-from filelock import FileLock, Timeout
+from datetime import date
+from pathlib import Path
 from typing import Any
-import subprocess
+
+from filelock import FileLock, Timeout
 from PIL import Image, ImageOps
 from pyproj import Transformer
 
@@ -52,7 +52,7 @@ def json_file(path: Any) -> Any:
 
 
 def normalize(text: Any) -> Any:
-    return "".join((c for c in unicodedata.normalize("NFKC", text) if c.isalnum()))
+    return "".join(c for c in unicodedata.normalize("NFKC", text) if c.isalnum())
 
 
 def check_text(value: Any, label: Any) -> Any:
@@ -76,7 +76,7 @@ def make_contact(args: Any) -> Any:
         raise InputError("National ID must contain one to nine digits.")
     number = number.zfill(9)
     products = [int(digit) * (1 + i % 2) for (i, digit) in enumerate(number)]
-    if number == "000000000" or sum((n if n < 10 else n - 9 for n in products)) % 10:
+    if number == "000000000" or sum(n if n < 10 else n - 9 for n in products) % 10:
         raise InputError("National ID checksum is invalid.")
     phone = re.sub("[\\s()\\-]", "", args.phone)
     if phone.startswith("+972"):
@@ -217,7 +217,7 @@ class Addresses:
                 (x, y) = gps_xy
                 if (
                     points
-                    and min((math.hypot(p[0] - x, p[1] - y) for p in points)) > 200
+                    and min(math.hypot(p[0] - x, p[1] - y) for p in points) > 200
                 ):
                     raise InputError(
                         "The supplied address is more than 200 m from the photo GPS. Check the address."
@@ -229,7 +229,7 @@ class Addresses:
                         "Photo has no usable GPS and this house number is absent from the address data."
                     )
                 (x, y) = points[0][:2]
-                if any((math.hypot(p[0] - x, p[1] - y) > 100 for p in points)):
+                if any(math.hypot(p[0] - x, p[1] - y) > 100 for p in points):
                     raise InputError(
                         "This address has multiple locations. Use a photo with GPS."
                     )
@@ -261,10 +261,10 @@ class Addresses:
                 or (len(nearby) > 1 and nearby[1][0] - nearby[0][0] < 8)
             ):
                 choices = "; ".join(
-                    (
+                    
                         f"{(self.streets[c]['StreetName'] if c else name)} {h} ({d:.0f} m)"
                         for (d, h, c, name) in nearby
-                    )
+                    
                 )
                 raise InputError(
                     "GPS does not identify one clear address. Supply --address. Nearby: "

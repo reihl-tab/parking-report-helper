@@ -2,11 +2,11 @@
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 CAR = {"plate": "00-000-00", "street": "Example 1", "datetime": "2026-01-02 03:04"}
 

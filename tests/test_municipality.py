@@ -2,11 +2,11 @@
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 from parking_report.municipality import (
     MISSING,
@@ -36,9 +36,8 @@ class TestMunicipality(unittest.TestCase):
 
     def test_unknown_config_rejected(self):
         for name in ("nowhere", "../x", ""):
-            with self.subTest(name=name):
-                with self.assertRaises(ValueError):
-                    load_config(name)
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                load_config(name)
 
     def test_config_from_path(self):
         with tempfile.TemporaryDirectory() as directory:

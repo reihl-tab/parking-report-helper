@@ -1,13 +1,15 @@
 """Private Git-backed 106 ledger. Fail closed on stale writers or uncertain writes."""
 
 from __future__ import annotations
-from contextlib import contextmanager
+
 import hashlib
 import json
-from pathlib import Path
 import re
 import subprocess
-from typing import Any, Iterator
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
 
 from filelock import FileLock
 

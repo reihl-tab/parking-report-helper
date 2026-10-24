@@ -1,9 +1,10 @@
 import argparse
 import json
+import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import unittest
 from unittest.mock import patch
+
 from parking_report.api_cli import execute
 
 
@@ -72,9 +73,8 @@ class CategoryRoutingTests(unittest.TestCase):
 
 class ReviewedDescriptionTests(unittest.TestCase):
     def test_explicit_description_in_payload_and_digest(self):
-        import hashlib
-        from parking_report.api_cli import prepare
         from parking_report.api106 import Addresses
+        from parking_report.api_cli import prepare
 
         with TemporaryDirectory() as directory:
             folder = Path(directory)

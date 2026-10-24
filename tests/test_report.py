@@ -33,9 +33,8 @@ class TestValidation(unittest.TestCase):
     def test_date_edges(self):
         self.assertEqual(format_datetime(" 2024-02-29T23:59 "), "29.2.2024, 23:59")
         for value in ("2025-02-29 10:00", "2026-01-01 24:00", "2026-13-01 00:00"):
-            with self.subTest(value=value):
-                with self.assertRaises(ValueError):
-                    format_datetime(value)
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                format_datetime(value)
 
     def test_input_is_not_mutated(self):
         record = {**CAR, "plate": " 00-000-00 "}

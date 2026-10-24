@@ -6,9 +6,9 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
-from contextlib import nullcontext
 from collections.abc import Mapping, Sequence
+from contextlib import nullcontext
+from pathlib import Path
 from typing import Any
 
 from .intake import record_to_car
@@ -31,7 +31,7 @@ def prepare(
     folder: Path, addresses: Path, reporter: Mapping[str, str]
 ) -> tuple[dict[str, Any], dict[str, Any], bytes, str]:
     """Validate the original private record and prepare the same payload for both modes."""
-    from .api106 import Addresses, make_contact, read_picture, check_text
+    from .api106 import Addresses, check_text, make_contact, read_picture
 
     record = json.loads((folder / "report.json").read_text(encoding="utf-8"))
     car = record_to_car(record)
@@ -106,7 +106,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = p.parse_args(argv)
     try:
-        from .api106 import Municipality, submit
 
         contact, report, jpeg, digest = prepare(
             args.folder, args.addresses, private_values(os.environ)

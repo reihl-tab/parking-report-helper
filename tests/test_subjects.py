@@ -3,14 +3,14 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
-from tempfile import TemporaryDirectory
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from parking_report.api_cli import prepare, execute
+from parking_report.api_cli import execute, prepare
 from parking_report.intake import record_to_car
 from parking_report.report import build_report
 from parking_report.subjects import load_catalog, select_subject, validate_owner_choice
@@ -179,8 +179,9 @@ class SubjectTests(unittest.TestCase):
             r["violation"]["category"] = "sidewalk_parking"
             save()
             contact, payload, _, historic_digest = prepare(folder, addresses, reporter)
-            from parking_report.api106 import read_picture
             import hashlib
+
+            from parking_report.api106 import read_picture
 
             historic = json.dumps(
                 {

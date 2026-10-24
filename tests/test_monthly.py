@@ -2,12 +2,13 @@
 
 import csv
 import io
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
+
 from parking_report.monthly import REQUIRED, monthly_draft
 
 
@@ -22,7 +23,6 @@ def row(**changes):
             ref_mapping="unverified_fifo",
             plate="SYNTHETIC-PRIVATE-PLATE",
             notes="PRIVATE-NOTES",
-            **{},
         )
         | changes
     )

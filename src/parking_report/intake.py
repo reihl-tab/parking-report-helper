@@ -62,7 +62,7 @@ def record_to_car(record: object) -> dict[str, str]:
         raise ValueError(
             "address.house_number is missing; confirm a number or research the nearest numbered address and mark it approximate"
         )
-    from .subjects import select_subject, is_parking_subject
+    from .subjects import is_parking_subject, select_subject
 
     parking = is_parking_subject(select_subject(record))
     if not parking and not _text(violation.get("description")):

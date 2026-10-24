@@ -1,6 +1,7 @@
 import unittest
 from datetime import date
-from parking_report.registry import lookup, VEHICLES
+
+from parking_report.registry import VEHICLES, lookup
 
 
 class RegistryTests(unittest.TestCase):

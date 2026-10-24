@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import argparse
 import csv
-from datetime import date
-from pathlib import Path
 import re
 import sys
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from datetime import date
+from pathlib import Path
 
 REQUIRED = {
     "folder_id",

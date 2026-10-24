@@ -1,15 +1,14 @@
 """Functional durable ledger tests use only temporary local Git repositories."""
 
 import json
-from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from pathlib import Path
 
 try:
+    from parking_report.api106 import ReviewNeeded, submit
     from parking_report.ledger import GitLedger, LedgerError
-    from parking_report.api106 import submit, ReviewNeeded
 except ImportError:
     GitLedger = None
 
@@ -71,9 +70,8 @@ class LedgerTests(unittest.TestCase):
         self.git(b, "checkout", "106-ledger")
         with GitLedger(self.a).locked() as ledger:
             ledger.reserve("one", "a" * 64, "b" * 64)
-        with self.assertRaises(LedgerError):
-            with GitLedger(b).locked():
-                pass
+        with self.assertRaises(LedgerError), GitLedger(b).locked():
+            pass
 
     def test_uncertain_creation_survives_fresh_runner(self):
         class Fake:
@@ -183,6 +181,5 @@ class LedgerTests(unittest.TestCase):
         with self.assertRaises(LedgerError):
             with GitLedger(self.a).locked() as ledger:
                 ledger.reserve("one", "a" * 64, "b" * 64)
-        with self.assertRaises(LedgerError):
-            with GitLedger(self.a).locked():
-                pass
+        with self.assertRaises(LedgerError), GitLedger(self.a).locked():
+            pass

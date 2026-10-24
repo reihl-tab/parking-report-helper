@@ -1,15 +1,17 @@
 """Government plate lookup. Write only a private result file; never log registry data."""
 
 from __future__ import annotations
+
 import argparse
-from datetime import date, datetime
 import json
 import os
-from pathlib import Path
 import re
-from typing import Any, Callable
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
+from datetime import date, datetime
+from pathlib import Path
+from typing import Any
 
 BASE = "https://data.gov.il/api/3/action/datastore_search"
 VEHICLES = "053cea08-09bc-40ec-8f7a-156f0677aff3"

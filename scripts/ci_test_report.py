@@ -2,16 +2,16 @@
 
 import argparse
 import ast
-import inspect
-import math
-import textwrap
 import html
-import re
+import inspect
 import json
+import math
 import os
-from pathlib import Path
+import re
 import sys
+import textwrap
 import unittest
+from pathlib import Path
 
 
 def safe_text(value):

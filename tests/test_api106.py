@@ -88,10 +88,9 @@ class ProtocolTests(unittest.TestCase):
             patch.dict(os.environ, {"PARKING_STATE_GIT": "1"}),
             patch.object(
                 api106.subprocess, "run", return_value=argparse.Namespace(returncode=1)
-            ),
+            ),self.assertRaises(api106.ReviewNeeded)
         ):
-            with self.assertRaises(api106.ReviewNeeded):
-                api106.submit(Fake(), {}, {}, b"jpeg", "c" * 64, Path(tmp))
+            api106.submit(Fake(), {}, {}, b"jpeg", "c" * 64, Path(tmp))
 
     def test_redirect_is_not_followed(self):
         self.assertIsNone(
