@@ -256,6 +256,7 @@ class TestDrive(unittest.TestCase):
                 encoding="utf-8",
                 env=env,
                 timeout=30,
+                check=False,
             )
             self.assertEqual(ok.returncode, 0, ok.stderr)
             self.assertIn("התנופה", ok.stdout)
@@ -278,6 +279,7 @@ class TestDrive(unittest.TestCase):
                 encoding="utf-8",
                 env=env,
                 timeout=30,
+                check=False,
             )
         self.assertEqual(bad.returncode, 1)
         self.assertEqual(len(drive.requests) - before, 1)

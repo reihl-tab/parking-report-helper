@@ -46,6 +46,7 @@ class Synthetic(unittest.TestCase):
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             )
             self.assertEqual(result.returncode, 1)
             metrics = json.loads(output.read_text())
@@ -94,6 +95,7 @@ class Synthetic(unittest.TestCase):
                         str(output),
                     ],
                     capture_output=True,
+                    check=False,
                 )
                 self.assertEqual(result.returncode, 0 if success else 1)
                 data = json.loads(output.read_text())

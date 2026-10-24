@@ -23,6 +23,7 @@ class TestCLI(unittest.TestCase):
                 encoding="utf-8",
                 timeout=10,
                 env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                check=False,
             )
 
     def test_success_with_options(self):
@@ -77,6 +78,7 @@ class TestCLI(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
         self.assertEqual(result.returncode, 1)
         self.assertIn("error:", result.stderr)
@@ -88,6 +90,7 @@ class TestCLI(unittest.TestCase):
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("--no-photo", result.stdout)

@@ -142,7 +142,9 @@ class ProtocolTests(unittest.TestCase):
                 "--addresses",
                 str(folder / "addresses.json"),
             ]
-            out = subprocess.run(cmd, env=env, capture_output=True, text=True)
+            out = subprocess.run(
+                cmd, env=env, capture_output=True, text=True, check=False
+            )
             self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
             data = json.loads(out.stdout)
             self.assertEqual(data["network_requests"], 0)
@@ -153,6 +155,7 @@ class ProtocolTests(unittest.TestCase):
                 env=env,
                 capture_output=True,
                 text=True,
+                check=False,
             )
             self.assertEqual(out.returncode, 4)
             self.assertNotIn("fake-code", out.stdout)

@@ -116,6 +116,7 @@ class MonthlyTests(unittest.TestCase):
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             )
 
     def csv_text(self, rows):

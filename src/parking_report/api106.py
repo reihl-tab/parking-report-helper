@@ -526,7 +526,9 @@ def save_state(path: Any, state: Any) -> Any:
                 ["git", "commit", "-m", "Record 106 progress"],
                 ["git", "push", "origin", "HEAD"],
             ):
-                result = subprocess.run(command, cwd=path.parent, capture_output=True)
+                result = subprocess.run(
+                    command, cwd=path.parent, capture_output=True, check=False
+                )
                 if result.returncode:
                     raise ReviewNeeded(
                         "Private state persistence failed; stop and reconcile before retrying."

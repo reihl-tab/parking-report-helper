@@ -33,4 +33,5 @@ def run_cli(*args: str) -> subprocess.CompletedProcess:
         encoding="utf-8",
         timeout=30,
         env=env,
+        check=False,
     )

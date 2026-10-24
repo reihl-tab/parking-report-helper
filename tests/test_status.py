@@ -145,6 +145,7 @@ class StatusTests(unittest.TestCase):
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             )
 
     def test_real_cli_legacy_csv_and_bom(self):

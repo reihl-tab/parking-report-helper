@@ -104,6 +104,7 @@ class TestMunicipalityCLI(unittest.TestCase):
                 encoding="utf-8",
                 timeout=10,
                 env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                check=False,
             )
 
     def test_text_output(self):

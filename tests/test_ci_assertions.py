@@ -39,6 +39,7 @@ class T(unittest.TestCase):
                     str(output),
                 ],
                 capture_output=True,
+                check=False,
             )
             self.assertEqual(result.returncode, 1)
             data = json.loads(output.read_text())

@@ -31,7 +31,11 @@ class GitLedger:
 
     def git(self, *args: str) -> str:
         result = subprocess.run(
-            ["git", *args], cwd=self.root, capture_output=True, text=True
+            ["git", *args],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.returncode:
             raise LedgerError(

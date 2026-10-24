@@ -164,7 +164,9 @@ class SubjectTests(unittest.TestCase):
                 "--addresses",
                 str(addresses),
             ]
-            out = subprocess.run(cmd, env=env, capture_output=True, text=True)
+            out = subprocess.run(
+                cmd, env=env, capture_output=True, text=True, check=False
+            )
             self.assertEqual(out.returncode, 0, out.stderr)
             self.assertEqual(json.loads(out.stdout)["network_requests"], 0)
             r["approved_description"] = "  " + r["approved_description"] + "\n"
@@ -207,6 +209,8 @@ class SubjectTests(unittest.TestCase):
                 self.assertNotEqual(prepare(folder, addresses, reporter)[3], digest)
             r["municipal_subject"]["code"] = "999999"
             save()
-            out = subprocess.run(cmd, env=env, capture_output=True, text=True)
+            out = subprocess.run(
+                cmd, env=env, capture_output=True, text=True, check=False
+            )
             self.assertEqual(out.returncode, 4)
             self.assertNotIn("fake", out.stdout)
