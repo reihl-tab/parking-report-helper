@@ -14,19 +14,19 @@ from parking_report.status import REQUIRED, status_draft
 
 def row(**changes):
     return (
-        dict(
-            folder_id="synthetic-a",
-            filed_date="2026-10-01",
-            street="רחוב לדוגמה",
-            event_type="sidewalk",
-            plate="00-000-00",
-            municipal_ref="2610-000001",
-            ref_mapping="verified_receipt",
-            receipt_evidence="synthetic-receipt.json",
-            municipal_response="no_reply",
-            response_checked_at="2026-10-08",
-            response_evidence="synthetic-mail-check",
-        )
+        {
+            "folder_id": "synthetic-a",
+            "filed_date": "2026-10-01",
+            "street": "רחוב לדוגמה",
+            "event_type": "sidewalk",
+            "plate": "00-000-00",
+            "municipal_ref": "2610-000001",
+            "ref_mapping": "verified_receipt",
+            "receipt_evidence": "synthetic-receipt.json",
+            "municipal_response": "no_reply",
+            "response_checked_at": "2026-10-08",
+            "response_evidence": "synthetic-mail-check",
+        }
         | changes
     )
 
