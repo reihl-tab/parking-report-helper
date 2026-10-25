@@ -178,8 +178,7 @@ class LedgerTests(unittest.TestCase):
         hook = self.remote / "hooks/pre-receive"
         hook.write_text("#!/bin/sh\nexit 1\n")
         hook.chmod(0o755)
-        with self.assertRaises(LedgerError):
-            with GitLedger(self.a).locked() as ledger:
-                ledger.reserve("one", "a" * 64, "b" * 64)
+        with self.assertRaises(LedgerError), GitLedger(self.a).locked() as ledger:
+            ledger.reserve("one", "a" * 64, "b" * 64)
         with self.assertRaises(LedgerError), GitLedger(self.a).locked():
             pass
