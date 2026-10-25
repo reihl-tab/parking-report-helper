@@ -1,5 +1,6 @@
 import unittest
 from datetime import date
+from typing import ClassVar
 
 from parking_report.registry import VEHICLES, lookup
 
@@ -43,7 +44,7 @@ from parking_report.report import build_report
 
 
 class DescribeTests(unittest.TestCase):
-    base = {"plate": "1234567", "checked_on": "2026-10-08"}
+    base: ClassVar[dict[str, str]] = {"plate": "1234567", "checked_on": "2026-10-08"}
 
     def matched(self, expiry, tag=None):
         out = dict(

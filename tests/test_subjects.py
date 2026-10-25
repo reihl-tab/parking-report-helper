@@ -198,13 +198,13 @@ class SubjectTests(unittest.TestCase):
                 historic_digest, hashlib.sha256(historic.encode()).hexdigest()
             )
             for mutate in (
-                lambda: r["municipal_subject"].update(code="1016"),
-                lambda: r["municipal_subject"].update(owner_choice=False),
-                lambda: r["violation"].update(category="broken_sign"),
-                lambda: r.update(approved_description="נוסח אחר"),
+                lambda rec: rec["municipal_subject"].update(code="1016"),
+                lambda rec: rec["municipal_subject"].update(owner_choice=False),
+                lambda rec: rec["violation"].update(category="broken_sign"),
+                lambda rec: rec.update(approved_description="נוסח אחר"),
             ):
                 r = record()
-                mutate()
+                mutate(r)
                 save()
                 self.assertNotEqual(prepare(folder, addresses, reporter)[3], digest)
             r["municipal_subject"]["code"] = "999999"
