@@ -66,16 +66,15 @@ class Service:
             return reply("400 Bad Request", {"status": "invalid_request"})
         if environ.get("CONTENT_LENGTH", "") not in ("", "0"):
             return reply("400 Bad Request", {"status": "body_not_allowed"})
+        login = {
+            "UserName": self.env.get("PARKING_106_USERNAME", ""),
+            "Password": self.env.get("PARKING_106_PASSWORD", ""),
+        }
         credentials = {
             "subscription_key": self.env.get("PARKING_106_SUBSCRIPTION_KEY", ""),
-            "login": {
-                "UserName": self.env.get("PARKING_106_USERNAME", ""),
-                "Password": self.env.get("PARKING_106_PASSWORD", ""),
-            },
+            "login": login,
         }
-        if not credentials["subscription_key"] or not all(
-            credentials["login"].values()
-        ):
+        if not credentials["subscription_key"] or not all(login.values()):
             return reply("503 Service Unavailable", {"status": "configuration_missing"})
         with self.lock:
             if self.consumed:

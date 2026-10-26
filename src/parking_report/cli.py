@@ -78,6 +78,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         ):
             if used:
                 parser.error(f"{flag} requires --municipality")
+    # The cars input is validated by its consumers (build_reports and
+    # build_submissions take object and reject non-lists), so keep it untyped here.
+    cars: object
     try:
         photos: list[str] = []
         if args.intake:

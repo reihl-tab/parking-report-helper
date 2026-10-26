@@ -121,7 +121,8 @@ def describe_he(result: Any) -> str:
         "בדיקה במאגרי משרד התחבורה" + (f" (נכון ל-{checked})" if checked else "") + ":"
     ]
     vehicle_lookup = result.get("vehicle_lookup")
-    vehicle = result.get("vehicle") if isinstance(result.get("vehicle"), dict) else {}
+    vehicle_raw = result.get("vehicle")
+    vehicle: dict[str, Any] = vehicle_raw if isinstance(vehicle_raw, dict) else {}
     if vehicle_lookup == "matched":
         name = " ".join(
             str(vehicle[k]).strip()
@@ -153,11 +154,8 @@ def describe_he(result: Any) -> str:
     # No match or failed lookup: say nothing about licence/test (unknown is not a finding).
     disability_lookup = result.get("disability_lookup")
     if disability_lookup == "matched":
-        tag = (
-            result.get("disability")
-            if isinstance(result.get("disability"), dict)
-            else {}
-        )
+        tag_raw = result.get("disability")
+        tag: dict[str, Any] = tag_raw if isinstance(tag_raw, dict) else {}
         text = "לרכב רשום תג נכה במאגר תגי הנכים"
         kind = tag.get("SUG TAV")
         if kind not in (None, ""):

@@ -175,12 +175,12 @@ def in_jerusalem(lat: Any, lon: Any) -> Any:
 
 
 class Addresses:
-    def __init__(self, path: Any) -> Any:
+    def __init__(self, path: Any) -> None:
         data = json_file(path)
         if not isinstance(data, dict) or data.get("version") != 1:
             raise InputError("Unsupported address lookup format.")
         self.streets = {str(s["StreetCode"]): s for s in data["streets"]}
-        self.aliases = {}
+        self.aliases: dict[str, set[str]] = {}
         for code, street in self.streets.items():
             for key in ("StreetName", "StreetArabicName"):
                 if street.get(key):
@@ -270,7 +270,11 @@ class Addresses:
                     "GPS does not identify one clear address. Supply --address. Nearby: "
                     + (choices or "none")
                 )
-            (_, house, code, _) = nearby[0]
+            (_, house, nearest_code, _) = nearby[0]
+            # The guard above already rejected a None street code; this only
+            # narrows the type for mypy (no behavior change).
+            assert nearest_code is not None
+            code = nearest_code
             source = "photo_gps"
         return {
             "street_code": code,
@@ -290,7 +294,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class Municipality:
-    def __init__(self, credentials: Any) -> Any:
+    def __init__(self, credentials: Any) -> None:
         try:
             assert (
                 isinstance(credentials["subscription_key"], str)
@@ -553,7 +557,7 @@ def submit(
     path = state_dir / (fingerprint + ".json")
     try:
         with FileLock(str(path) + ".lock", timeout=0, mode=384):
-            state = (
+            state: dict[str, Any] = (
                 dict(initial_state)
                 if initial_state is not None
                 else (
