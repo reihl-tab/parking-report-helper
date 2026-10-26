@@ -1,0 +1,38 @@
+name: Sync labels to project board
+
+# Labels on issues/PRs are the source of truth; this mirrors them onto the
+# owner's project board (users/reihlinstinct/projects/2) so contributors
+# without board access stay in sync. Mapping: .github/project-sync.json.
+# Dry run (plan only) until the repo variable PROJECT_SYNC is "on".
+on:
+  issues:
+    types: [opened, reopened, closed, labeled, unlabeled]
+  pull_request:
+    types: [opened, reopened, closed, labeled, unlabeled]
+
+permissions: {}
+
+concurrency:
+  group: project-sync-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/project_sync.py
+            .github/project-sync.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Mirror labels to the board
+        env:
+          PROJECT_PAT: ${{ secrets.PROJECT_PAT }}
+          PROJECT_SYNC: ${{ vars.PROJECT_SYNC }}
+        run: python scripts/project_sync.py

@@ -1,0 +1,24 @@
+{
+  "_comment": "Labels -> board fields for scripts/project_sync.py. Option names must match the board (case-insensitive); unmatched ones are warned and skipped. First matching rule wins.",
+  "project": {"owner": "reihlinstinct", "number": 2},
+  "fields": {
+    "Status": {
+      "rules": [
+        {"state": "merged", "option": "Done"},
+        {"state": "closed", "option": "Done"},
+        {"label": "status: blocked", "option": "Blocked"},
+        {"label": "status: held", "option": "Held"},
+        {"label": "status: needs-review", "option": "In Review"},
+        {"label": "status: in-progress", "option": "In Progress"}
+      ],
+      "default": "Todo"
+    },
+    "Priority": {
+      "rules": [
+        {"label": "priority: high", "option": "High"},
+        {"label": "priority: medium", "option": "Medium"},
+        {"label": "priority: low", "option": "Low"}
+      ]
+    }
+  }
+}
