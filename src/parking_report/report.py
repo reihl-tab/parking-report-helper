@@ -36,7 +36,7 @@ class Car:
     @classmethod
     def from_mapping(cls, data: object) -> Car:
         if not isinstance(data, Mapping):
-            raise ValueError("each car must be a JSON object")
+            raise ValueError("each car must be a JSON object")  # noqa: TRY004 - malformed input data; callers catch ValueError
         kind = data.get("draft_kind", "parking")
         if kind not in {"parking", "municipal_issue"}:
             raise ValueError("unknown draft kind")
@@ -111,7 +111,7 @@ def build_report(
 def build_reports(cars: object, **kwargs: Any) -> list[str]:
     """Build a report per car; errors name the failing 1-based position."""
     if not isinstance(cars, list):
-        raise ValueError("input must be a JSON list of cars")
+        raise ValueError("input must be a JSON list of cars")  # noqa: TRY004 - malformed input data; callers catch ValueError
     reports: list[str] = []
     for index, car in enumerate(cars, start=1):
         try:

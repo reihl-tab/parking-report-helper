@@ -37,7 +37,7 @@ def _text(value: object) -> str:
 def record_to_car(record: object) -> dict[str, str]:
     """Map one record to the car mapping used by report.py. Raises ValueError if not usable."""
     if not isinstance(record, dict):
-        raise ValueError("record must be a JSON object")
+        raise ValueError("record must be a JSON object")  # noqa: TRY004 - malformed input data; callers catch ValueError or broadly
     if record.get("schema_version") != SCHEMA_VERSION:
         raise ValueError(f"unsupported schema_version {record.get('schema_version')!r}")
     status = _text(record.get("status"))

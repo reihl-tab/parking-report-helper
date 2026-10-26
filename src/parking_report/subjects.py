@@ -42,7 +42,7 @@ def select_subject(record: dict[str, Any]) -> str:
     if selection is None:
         return DEFAULT_SUBJECT
     if not isinstance(selection, dict):
-        raise ValueError("municipal_subject must be an object")
+        raise ValueError("municipal_subject must be an object")  # noqa: TRY004 - malformed input data; callers catch ValueError or broadly
     code = selection.get("code")
     if not isinstance(code, str) or code not in load_catalog():
         raise ValueError("Unknown subject code; use a string from the captured catalog")

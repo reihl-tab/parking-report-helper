@@ -468,7 +468,7 @@ class Municipality:
                 if not isinstance(item, dict) or not isinstance(
                     item.get("Content"), str
                 ):
-                    raise ValueError()
+                    raise ValueError()  # noqa: TRY004 - malformed input data; callers catch ValueError
                 content = base64.b64decode(item["Content"], validate=True)
                 if not content or len(content) > 20 * 1024 * 1024:
                     raise ValueError()

@@ -67,7 +67,7 @@ def lookup(
             result = fetch(resource, field, plate)
             rows = result.get("records")
             if not isinstance(rows, list):
-                raise ValueError("Missing records")
+                raise ValueError("Missing records")  # noqa: TRY004 - malformed API data; lookup loop catches broadly
             total = result.get("total")
             if not isinstance(total, int) or total != len(rows):
                 raise ValueError("Ambiguous result")

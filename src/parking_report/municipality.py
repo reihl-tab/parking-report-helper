@@ -33,7 +33,7 @@ def load_config(name_or_path: str) -> dict[str, Any]:
             raise ValueError(f"unknown municipality {name_or_path!r}") from None
     config = json.loads(text)
     if not isinstance(config, dict) or not isinstance(config.get("fields"), list):
-        raise ValueError("invalid municipality config: 'fields' list required")
+        raise ValueError("invalid municipality config: 'fields' list required")  # noqa: TRY004 - malformed input data; callers catch ValueError
     return config
 
 
@@ -85,7 +85,7 @@ def build_submissions(
 ) -> list[list[tuple[str, str, str]]]:
     """Build the form rows for every car; errors name the failing 1-based position."""
     if not isinstance(cars, list):
-        raise ValueError("input must be a JSON list of cars")
+        raise ValueError("input must be a JSON list of cars")  # noqa: TRY004 - malformed input data; callers catch ValueError
     submissions = []
     for index, car in enumerate(cars, start=1):
         try:
