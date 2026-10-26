@@ -538,10 +538,16 @@ def save_state(path: Any, state: Any) -> Any:
                 ["git", "commit", "-m", "Record 106 progress"],
                 ["git", "push", "origin", "HEAD"],
             ):
-                result = subprocess.run(
-                    command, cwd=path.parent, capture_output=True, check=False
-                )
-                if result.returncode:
+                # check=False: the return code is inspected below. A git that
+                # cannot start (OSError) or a SubprocessError is the same
+                # failure and maps to the same ReviewNeeded; its text is withheld.
+                try:
+                    result = subprocess.run(
+                        command, cwd=path.parent, capture_output=True, check=False
+                    )
+                except (OSError, subprocess.SubprocessError):
+                    result = None
+                if result is None or result.returncode:
                     raise ReviewNeeded(
                         "Private state persistence failed; stop and reconcile before retrying."
                     )
