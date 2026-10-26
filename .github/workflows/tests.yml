@@ -102,3 +102,61 @@ jobs:
               raise SystemExit('Health smoke failed')
           PY
           test "$(docker exec parking-http id -u)" != 0
+
+  security:
+    # Issue #74: bandit (Python SAST beyond CodeQL) and pip-audit (CVEs in the
+    # resolved environment, not only declared deps). Measure-only: findings are
+    # reported in the job summary; the job fails only when the repo variable
+    # SECURITY_GATE=on (planned for December), the same pattern as COVERAGE_GATE.
+    name: Security scan (bandit + pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Install package and freeze the resolved environment
+        run: |
+          python -m pip install ".[api]"
+          python -m pip freeze --exclude-editable > resolved-requirements.txt
+          python -m pip install "bandit>=1.8,<2" "pip-audit>=2.9,<3"
+      - name: bandit over src/
+        env:
+          SECURITY_GATE: ${{ vars.SECURITY_GATE }}
+        run: |
+          status=0
+          bandit -r src -f txt -o bandit.txt || status=$?
+          {
+            echo "## bandit"
+            echo '```'
+            sed -n '/^Run metrics/,$p' bandit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -ne 0 ] && [ "$SECURITY_GATE" != "on" ]; then
+            echo "::warning::bandit reported findings; measure-only until SECURITY_GATE=on (issue #74)"
+            exit 0
+          fi
+          exit "$status"
+      - name: pip-audit of the resolved environment
+        env:
+          SECURITY_GATE: ${{ vars.SECURITY_GATE }}
+        run: |
+          status=0
+          pip-audit -r resolved-requirements.txt --no-deps --disable-pip \
+            --progress-spinner off --desc off -f markdown -o pip-audit.md || status=$?
+          { echo "## pip-audit"; cat pip-audit.md; } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -ne 0 ] && [ "$SECURITY_GATE" != "on" ]; then
+            echo "::warning::pip-audit found known vulnerabilities; measure-only until SECURITY_GATE=on (issue #74)"
+            exit 0
+          fi
+          exit "$status"
+      - name: Upload reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-reports
+          path: |
+            bandit.txt
+            pip-audit.md
+          retention-days: 30
