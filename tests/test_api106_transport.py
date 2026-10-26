@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import unittest
 import urllib.error
+from pathlib import Path
 from unittest.mock import patch
 
 from parking_report.api106 import APIError, InputError, Municipality
@@ -55,6 +59,34 @@ class TransportTests(unittest.TestCase):
         ):
             with self.subTest(creds=creds), self.assertRaises(InputError):
                 Municipality(creds)
+
+    def test_init_validation_survives_python_O(self):
+        # #110: the checks must not be asserts, which python -O strips.
+        code = (
+            "from parking_report.api106 import InputError, Municipality\n"
+            "for creds in ({'subscription_key': 'k', 'login': {'UserName': '', 'Password': 'p'}},\n"
+            "              {'subscription_key': '', 'login': {'UserName': 'u', 'Password': 'p'}},\n"
+            "              {'subscription_key': 1, 'login': {'UserName': 'u', 'Password': 'p'}}):\n"
+            "    try:\n"
+            "        Municipality(creds)\n"
+            "    except InputError:\n"
+            "        continue\n"
+            "    raise SystemExit('accepted invalid credentials under -O')\n"
+        )
+        src_dir = str(Path(__file__).resolve().parents[1] / "src")
+        env = dict(
+            os.environ,
+            PYTHONPATH=src_dir + os.pathsep + os.environ.get("PYTHONPATH", ""),
+        )
+        result = subprocess.run(
+            [sys.executable, "-O", "-c", code],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_request_success_shape(self):
         opener = FakeOpener({"Success": True, "Token": "t-1"})

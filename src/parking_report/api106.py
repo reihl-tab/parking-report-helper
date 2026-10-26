@@ -293,18 +293,26 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+CREDENTIALS_ERROR = (
+    "Credentials must contain subscription_key and login.UserName/login.Password."
+)
+
+
 class Municipality:
     def __init__(self, credentials: Any) -> None:
         try:
-            assert (
+            # Explicit checks, not assert: asserts vanish under python -O and
+            # this is a fail-closed input boundary (#110).
+            valid = bool(
                 isinstance(credentials["subscription_key"], str)
                 and credentials["subscription_key"]
+                and credentials["login"]["UserName"]
+                and credentials["login"]["Password"]
             )
-            assert credentials["login"]["UserName"] and credentials["login"]["Password"]
-        except (KeyError, TypeError, AssertionError) as exc:
-            raise InputError(
-                "Credentials must contain subscription_key and login.UserName/login.Password."
-            ) from exc
+        except (KeyError, TypeError) as exc:
+            raise InputError(CREDENTIALS_ERROR) from exc
+        if not valid:
+            raise InputError(CREDENTIALS_ERROR)
         self.credentials = credentials
 
     def request(self, endpoint: Any, body: Any) -> Any:
