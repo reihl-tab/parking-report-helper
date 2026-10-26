@@ -1,4 +1,0 @@
-[console_scripts]
-parking-report = parking_report.cli:main
-parking-report-106 = parking_report.api_cli:main
-parking-report-http = parking_report.http_service:main
