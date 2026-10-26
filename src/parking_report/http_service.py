@@ -98,7 +98,7 @@ class Service:
                     "502 Bad Gateway",
                     {"status": "login_failed", "diagnostic": diagnostic},
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - fail-closed boundary; no exception text exposed
                 return reply(
                     "502 Bad Gateway",
                     {"status": "login_failed", "diagnostic": "unknown"},
@@ -126,7 +126,7 @@ def main() -> None:
         port = int(os.environ.get("PORT", "10000"))
         if not 1 <= port <= 65535:
             raise ValueError("port")
-    except Exception:
+    except Exception:  # noqa: BLE001 - fail-closed boundary; no exception text exposed
         raise SystemExit(
             "HTTP service configuration is invalid; check private environment"
         ) from None

@@ -91,7 +91,7 @@ def lookup(
                 out["disability"] = {
                     k: row.get(k) for k in ("TAARICH HAFAKAT TAG", "SUG TAV")
                 }
-        except Exception:
+        except Exception:  # noqa: BLE001 - any lookup failure -> unverified
             out[key + "_lookup"] = "unverified"
     return out
 
@@ -186,7 +186,7 @@ def main() -> int:
             json.dump(result, stream, ensure_ascii=False, indent=2)
         print("Registry check saved privately; review unknown results before use.")
         return 0
-    except Exception:
+    except Exception:  # noqa: BLE001 - fail-closed boundary; no exception text exposed
         print("Registry check blocked; no private values printed.")
         return 4
 

@@ -128,7 +128,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return execute(
                 args, contact, report, jpeg, digest, ledger, entry, report_id
             )
-    except Exception:
+    except Exception:  # noqa: BLE001 - fail-closed boundary; no exception text exposed
         print(
             '{"status":"blocked","note":"Check private input and ledger; no automatic retry."}'
         )
