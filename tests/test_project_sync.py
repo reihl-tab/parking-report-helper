@@ -1,10 +1,13 @@
-"""Label -> project-board sync. Synthetic events and a fake GraphQL transport;
-no network, no token."""
+"""Label -> project-board proposals. Synthetic events and a fake GraphQL
+transport; no network, no token. The sync is proposal only: no test may see a
+board write."""
 
 import importlib.util
 import json
+import re
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 if not (ROOT / ".github/project-sync.json").is_file():
@@ -82,16 +85,21 @@ class FakeGraphQL:
         self.calls.append((query, dict(variables)))
         if "projectV2(number" in query:
             return {"user": {"projectV2": {"id": "P_1", "fields": {"nodes": BOARD}}}}
+        if re.search(r"\bmutation\b", query, re.IGNORECASE):
+            raise AssertionError("board write attempted: " + query)
         if "projectItems" in query:
             return {"node": {"projectItems": {"nodes": self.items}}}
-        if "addProjectV2ItemById" in query:
-            return {"addProjectV2ItemById": {"item": {"id": "PI_new"}}}
-        if "updateProjectV2ItemFieldValue" in query:
-            return {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "x"}}}
         raise AssertionError(query)
 
-    def sets(self):
-        return [v for q, v in self.calls if "updateProjectV2ItemFieldValue" in q]
+
+def proposals(out):
+    """[(field, option)] from the log lines "proposal: set F = O"."""
+    found = []
+    for line in out:
+        m = re.fullmatch(r"proposal: set (.+) = (.+)", line)
+        if m:
+            found.append((m.group(1), m.group(2)))
+    return found
 
 
 class DesiredValuesTests(unittest.TestCase):
@@ -140,65 +148,95 @@ class ResolveTests(unittest.TestCase):
 
 
 class SyncTests(unittest.TestCase):
-    def run_sync(self, ev, gql, apply):
+    def run_sync(self, ev, gql, config=CONFIG):
         out = []
-        rc = ps.sync(ev, CONFIG, gql, apply, log=out.append)
+        rc = ps.sync(ev, config, gql, log=out.append)
         return rc, out
 
-    def test_dry_run_reads_but_never_writes(self):
+    def test_reads_board_and_proposes_never_writes(self):
         gql = FakeGraphQL(items=[{"id": "PI_1", "project": {"id": "P_1"}}])
-        rc, out = self.run_sync(event(labels=["status: in-progress"]), gql, apply=False)
-        self.assertEqual(rc, 0)
-        self.assertEqual(gql.sets(), [])
-        self.assertFalse(any("addProjectV2ItemById" in q for q, _ in gql.calls))
-        self.assertIn("dry run: would set Status = In Progress", out)
-
-    def test_apply_sets_fields_on_existing_item(self):
-        gql = FakeGraphQL(items=[{"id": "PI_1", "project": {"id": "P_1"}}])
-        rc, _ = self.run_sync(
-            event(labels=["status: in-progress", "priority: high"]), gql, apply=True
+        rc, out = self.run_sync(
+            event(labels=["status: in-progress", "priority: high"]), gql
         )
         self.assertEqual(rc, 0)
-        self.assertEqual(
-            [(v["field"], v["option"], v["item"]) for v in gql.sets()],
-            [("F_status", "O_prog", "PI_1"), ("F_prio", "O_p1", "PI_1")],
-        )
+        self.assertEqual(proposals(out), [("Status", "In Progress"), ("Priority", "P1")])
+        self.assertIn("proposal only: nothing was written to the board", out)
+        self.assertEqual(len(gql.calls), 2)  # project fields + item values, reads only
 
-    def test_apply_adds_missing_item_first(self):
+    def test_missing_item_is_proposed_not_added(self):
         gql = FakeGraphQL(items=[{"id": "PI_other", "project": {"id": "P_other"}}])
-        self.run_sync(event(), gql, apply=True)
-        self.assertEqual(gql.sets()[0]["item"], "PI_new")
+        _, out = self.run_sync(event(), gql)
+        self.assertIn("proposal: add the item to the project", out)
+        self.assertEqual(proposals(out), [("Status", "Todo")])
 
-    def test_merged_pr_goes_to_done(self):
+    def test_closed_issue_proposes_done(self):
         gql = FakeGraphQL(items=[{"id": "PI_1", "project": {"id": "P_1"}}])
-        self.run_sync(
-            event(state="closed", merged=True, kind="pull_request"), gql, apply=True
-        )
-        self.assertEqual(gql.sets()[0]["option"], "O_done")
+        _, out = self.run_sync(event(state="closed"), gql)
+        self.assertEqual(proposals(out), [("Status", "Done")])
 
     def test_missing_board_option_is_skipped_with_warning(self):
         gql = FakeGraphQL(items=[{"id": "PI_1", "project": {"id": "P_1"}}])
-        rc, out = self.run_sync(event(labels=["status: blocked"]), gql, apply=True)
+        rc, out = self.run_sync(event(labels=["status: blocked"]), gql)
         self.assertEqual(rc, 0)
-        self.assertEqual(gql.sets(), [])
+        self.assertEqual(proposals(out), [])
         self.assertTrue(any(line.startswith("::warning::") for line in out))
 
-    def test_without_token_plans_only(self):
-        rc, out = self.run_sync(event(), None, apply=True)
+    def test_without_token_reads_nothing(self):
+        rc, out = self.run_sync(event(), None)
         self.assertEqual(rc, 0)
-        self.assertIn("no PROJECT_PAT available: plan only", out)
+        self.assertIn("no PROJECT_PAT available: board not read, labels only", out)
 
     def test_event_without_subject_is_a_noop(self):
-        rc, _ = self.run_sync({"action": "x"}, FakeGraphQL(), apply=True)
+        rc, _ = self.run_sync({"action": "x"}, FakeGraphQL())
         self.assertEqual(rc, 0)
+
+
+class ReadOnlyTests(unittest.TestCase):
+    """The sync has no write path, and its client refuses one."""
+
+    def test_no_mutation_in_module(self):
+        source = (ROOT / "scripts/project_sync.py").read_text(encoding="utf-8")
+        for name in ("addProjectV2ItemById", "updateProjectV2ItemFieldValue",
+                     "clearProjectV2ItemFieldValue", "deleteProjectV2Item"):
+            self.assertNotIn(name, source)
+        for value in vars(ps).values():
+            if isinstance(value, str):
+                self.assertIsNone(re.match(r"\s*mutation\b", value, re.IGNORECASE))
+
+    def test_client_refuses_mutation_before_network(self):
+        call = ps.graphql_client("synthetic-token")
+        with mock.patch.object(ps.urllib.request, "urlopen") as urlopen:
+            for query in ("mutation { x }", "  Mutation($a: ID!) { x }",
+                          "query { a } mutation { b }"):
+                with self.subTest(query=query), self.assertRaises(ValueError):
+                    call(query, {})
+            urlopen.assert_not_called()
+
+    def test_client_still_sends_queries(self):
+        call = ps.graphql_client("synthetic-token")
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        with mock.patch.object(ps.urllib.request, "urlopen", return_value=response), \
+                mock.patch.object(ps.json, "load", return_value={"data": {"ok": 1}}):
+            self.assertEqual(call(ps.Q_PROJECT, {"login": "x", "number": 1}), {"ok": 1})
+
+    def test_main_failure_never_echoes_exception_text(self):
+        out = []
+        with mock.patch.object(ps, "sync", side_effect=RuntimeError("synthetic-secret")), \
+                mock.patch.dict(ps.os.environ, {"GITHUB_EVENT_PATH": str(ROOT / "x"),
+                                                "PROJECT_PAT": ""}), \
+                mock.patch.object(ps.Path, "read_text", return_value="{}"), \
+                mock.patch("builtins.print", side_effect=out.append):
+            self.assertEqual(ps.main(), 0)
+        self.assertEqual(out, ["::warning::project sync proposal failed: RuntimeError"])
 
 
 class ManualOverrideTests(unittest.TestCase):
     """Manual board edits win over labels (compare-and-set)."""
 
-    def run_sync(self, ev, gql, apply=True, config=CONFIG):
+    def run_sync(self, ev, gql, config=CONFIG):
         out = []
-        rc = ps.sync(ev, config, gql, apply, log=out.append)
+        rc = ps.sync(ev, config, gql, log=out.append)
         return rc, out
 
     def test_decide_matrix(self):
@@ -214,15 +252,15 @@ class ManualOverrideTests(unittest.TestCase):
             with self.subTest(current=current, previous=previous):
                 self.assertEqual(ps.decide(desired, current, previous), want)
 
-    def test_label_change_updates_board_that_still_shows_old_label_value(self):
+    def test_label_change_proposed_when_board_still_shows_old_label_value(self):
         gql = FakeGraphQL(items=[board_item(Status="Todo")])
         ev = event(
             labels=["status: in-progress"],
             action="labeled",
             label="status: in-progress",
         )
-        self.run_sync(ev, gql)
-        self.assertEqual([v["option"] for v in gql.sets()], ["O_prog"])
+        _, out = self.run_sync(ev, gql)
+        self.assertEqual(proposals(out), [("Status", "In Progress")])
 
     def test_manual_status_wins_over_label(self):
         gql = FakeGraphQL(items=[board_item(Status="Blocked")])
@@ -233,7 +271,7 @@ class ManualOverrideTests(unittest.TestCase):
         )
         rc, out = self.run_sync(ev, gql)
         self.assertEqual(rc, 0)
-        self.assertEqual(gql.sets(), [])
+        self.assertEqual(proposals(out), [])
         self.assertTrue(any("manual value wins" in line for line in out))
 
     def test_manual_priority_wins_after_unlabel(self):
@@ -242,28 +280,28 @@ class ManualOverrideTests(unittest.TestCase):
         ev = event(
             labels=["priority: medium"], action="unlabeled", label="status: blocked"
         )
-        self.run_sync(ev, gql)
-        self.assertNotIn("F_prio", [v["field"] for v in gql.sets()])
+        _, out = self.run_sync(ev, gql)
+        self.assertNotIn("Priority", [f for f, _ in proposals(out)])
 
     def test_unknown_previous_never_overwrites_existing_value(self):
         # "opened"/"edited": no provable "before", so only empty fields are filled.
         gql = FakeGraphQL(items=[board_item(Status="In Review")])
-        self.run_sync(event(labels=["priority: high"], action="opened"), gql)
-        self.assertEqual([v["field"] for v in gql.sets()], ["F_prio"])
+        _, out = self.run_sync(event(labels=["priority: high"], action="opened"), gql)
+        self.assertEqual(proposals(out), [("Priority", "P1")])
 
-    def test_close_moves_untouched_board_to_done_but_not_manual_value(self):
+    def test_close_proposes_done_for_untouched_board_but_not_manual_value(self):
         gql = FakeGraphQL(items=[board_item(Status="In Progress")])
-        self.run_sync(
+        _, out = self.run_sync(
             event(state="closed", labels=["status: in-progress"], action="closed"), gql
         )
-        self.assertEqual([v["option"] for v in gql.sets()], ["O_done"])
+        self.assertEqual(proposals(out), [("Status", "Done")])
         gql = FakeGraphQL(items=[board_item(Status="Blocked")])
-        self.run_sync(
+        _, out = self.run_sync(
             event(state="closed", labels=["status: in-progress"], action="closed"), gql
         )
-        self.assertEqual(gql.sets(), [])
+        self.assertEqual(proposals(out), [])
 
-    def test_already_matching_value_is_not_rewritten(self):
+    def test_already_matching_value_is_not_proposed(self):
         gql = FakeGraphQL(items=[board_item(Status="In Progress")])
         ev = event(
             labels=["status: in-progress"],
@@ -272,23 +310,10 @@ class ManualOverrideTests(unittest.TestCase):
         )
         rc, out = self.run_sync(ev, gql)
         self.assertEqual(rc, 0)
-        self.assertEqual(gql.sets(), [])
+        self.assertEqual(proposals(out), [])
         self.assertIn("Status already In Progress", out)
 
-    def test_dry_run_reports_manual_conflict_without_writing(self):
-        gql = FakeGraphQL(items=[board_item(Status="Blocked")])
-        ev = event(
-            labels=["status: in-progress"],
-            action="labeled",
-            label="status: in-progress",
-        )
-        rc, out = self.run_sync(ev, gql, apply=False)
-        self.assertEqual(rc, 0)
-        self.assertEqual(gql.sets(), [])
-        self.assertTrue(any("manual value wins" in line for line in out))
-        self.assertFalse(any(line.startswith("dry run: would set") for line in out))
-
-    def test_queue_is_never_written_even_if_configured(self):
+    def test_queue_is_never_proposed_even_if_configured(self):
         board = [
             *BOARD,
             {"id": "F_q", "name": "Queue", "options": [{"id": "O_q", "name": "x"}]},
@@ -306,14 +331,14 @@ class ManualOverrideTests(unittest.TestCase):
                 return super().__call__(query, variables)
 
         gql = Fake(items=[board_item()])
-        self.run_sync(event(action="opened"), gql, config=config)
-        self.assertNotIn("F_q", [v["field"] for v in gql.sets()])
+        _, out = self.run_sync(event(action="opened"), gql, config=config)
+        self.assertNotIn("Queue", [f for f, _ in proposals(out)])
         self.assertIn("Queue", CONFIG["protected_fields"])
 
-    def test_no_write_no_item_added(self):
+    def test_no_proposal_no_item_add_proposed(self):
         gql = FakeGraphQL(items=[board_item(Status="Blocked")])
-        self.run_sync(event(action="edited"), gql)
-        self.assertFalse(any("addProjectV2ItemById" in q for q, _ in gql.calls))
+        _, out = self.run_sync(event(action="edited"), gql)
+        self.assertNotIn("proposal: add the item to the project", out)
 
     def test_previous_subject(self):
         labels = ["a", "B"]
@@ -347,10 +372,63 @@ class WorkflowContractTests(unittest.TestCase):
     def test_workflow_is_least_privilege_and_keeps_secrets_in_env(self):
         text = (ROOT / ".github/workflows/project-sync.yml").read_text(encoding="utf-8")
         self.assertIn("permissions: {}", text)
-        self.assertNotIn("pull_request_target", text)
         run_lines = [ln for ln in text.splitlines() if ln.strip().startswith("run:")]
         self.assertEqual(run_lines, ["        run: python scripts/project_sync.py"])
         self.assertIn("PROJECT_PAT: ${{ secrets.PROJECT_PAT }}", text)
+        self.assertNotIn("PROJECT_SYNC", text)
+
+
+PR_TRIGGERS = ("pull_request", "pull_request_target", "workflow_run")
+
+
+def workflow_triggers(text):
+    """Top-level event names under `on:` (block form, as this repo writes it)."""
+    lines = text.splitlines()
+    start = next(i for i, ln in enumerate(lines) if re.fullmatch(r"on:\s*", ln))
+    events = []
+    for ln in lines[start + 1:]:
+        if ln and not ln[0].isspace() and not ln.startswith("#"):
+            break
+        m = re.fullmatch(r"  ([A-Za-z_]+):.*", ln)
+        if m:
+            events.append(m.group(1))
+    return events
+
+
+class TokenTrustBoundaryTests(unittest.TestCase):
+    """Regression for the PR-head secret exposure: no pull-request-controlled
+    code may run in a job that receives PROJECT_PAT."""
+
+    def setUp(self):
+        self.text = (ROOT / ".github/workflows/project-sync.yml").read_text(
+            encoding="utf-8"
+        )
+
+    def test_trigger_parser(self):
+        sample = "name: x\non:\n  issues:\n    types: [opened]\n  pull_request:\n\njobs:\n"
+        self.assertEqual(workflow_triggers(sample), ["issues", "pull_request"])
+
+    def test_sync_runs_only_on_issue_events(self):
+        self.assertEqual(workflow_triggers(self.text), ["issues"])
+
+    def test_sync_checks_out_default_branch_not_pr_head(self):
+        self.assertIn("ref: ${{ github.event.repository.default_branch }}", self.text)
+        self.assertNotIn("github.event.pull_request", self.text)
+        self.assertNotIn("head_ref", self.text)
+        self.assertNotIn("head.sha", self.text)
+
+    def test_no_pr_triggered_workflow_runs_code_with_project_token(self):
+        # A pull_request-triggered job that checks out or runs code gets
+        # PR-controlled code; it must never see PROJECT_PAT.
+        for path in sorted((ROOT / ".github/workflows").glob("*.y*ml")):
+            text = path.read_text(encoding="utf-8")
+            if "secrets.PROJECT_PAT" not in text:
+                continue
+            if not set(workflow_triggers(text)) & set(PR_TRIGGERS):
+                continue
+            with self.subTest(workflow=path.name):
+                self.assertNotIn("actions/checkout", text)
+                self.assertNotRegex(text, r"(?m)^\s*(- )?run:")
 
 
 if __name__ == "__main__":

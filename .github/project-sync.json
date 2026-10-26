@@ -1,5 +1,5 @@
 {
-  "_comment": "Labels -> board fields for scripts/project_sync.py (design: docs/PROJECT-SYNC.md). Option names must match the board (case-insensitive); unmatched ones are warned and skipped, never created. First matching rule wins. Manual board values win (compare-and-set). Protected fields are never written. UNVERIFIED: the Status option names below have not been checked against Project 6; confirm them before PROJECT_SYNC=on.",
+  "_comment": "Labels -> board fields for scripts/project_sync.py (design: docs/PROJECT-SYNC.md). Option names must match the board (case-insensitive); unmatched ones are warned and skipped, never created. First matching rule wins. Proposal only: nothing is written to the board. Manual board values win (compare-and-set). Protected fields are never proposed. UNVERIFIED: the Status option names below have not been checked against Project 6.",
   "project": {"owner": "reihlinstinct", "number": 6},
   "protected_fields": ["Queue"],
   "fields": {

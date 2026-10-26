@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
-"""Propose issue/PR label and state changes to the owner's GitHub Project board.
+"""Propose issue label and state changes for the owner's GitHub Project board.
 
-Labels are an input, not the source of truth: manual board edits win.
-Contributors without board access (Claude's sessions, forks) update labels,
-and this script, run by .github/workflows/project-sync.yml, carries a label
-or state change onto the matching single-select field (Status, Priority)
-only when the board still shows what the labels said before the change.
+Proposal only: this script never writes to the board. It contains no GraphQL
+mutation, and its client refuses to send one. Labels are an input, not the
+source of truth: manual board edits win. For each issue event it reads the
+matching single-select fields (Status, Priority) and logs what a label or
+state change *would* set, using compare-and-set: a value is proposed only when
+the field is empty or still equals what the labels said before the event.
+Anything else is reported as a manual edit and left alone.
 Design note: docs/PROJECT-SYNC.md.
 
-Safe by default:
-- Dry run unless the repo variable PROJECT_SYNC is "on": it prints the plan
-  and changes nothing.
-- Manual board values win: a field is written only when it is empty or
-  still equals the value derived from the labels *before* this event
-  (compare-and-set). Anything else is a manual edit and is left alone.
-- Protected fields (the curated Queue text) are never written.
-- Fields or options missing on the board are reported and skipped, never
-  created.
+- Run by .github/workflows/project-sync.yml on `issues` events only, from the
+  default branch, so no pull-request code ever runs with the project token.
+- Protected fields (the curated Queue text) are never proposed.
+- Fields or options missing on the board are reported, never created.
 - Only stdlib; the token comes from the environment and is never printed.
 """
 
@@ -24,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping
@@ -63,20 +61,6 @@ fragment item on ProjectV2Item {
     }
   }
 }"""
-M_ADD = """
-mutation($project: ID!, $content: ID!) {
-  addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
-    item { id }
-  }
-}"""
-M_SET = """
-mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
-  updateProjectV2ItemFieldValue(input: {
-    projectId: $project, itemId: $item, fieldId: $field,
-    value: {singleSelectOptionId: $option}
-  }) { projectV2Item { id } }
-}"""
-
 GraphQL = Callable[[str, Mapping[str, Any]], dict[str, Any]]
 
 SET, NOOP, MANUAL = "set", "noop", "manual"
@@ -190,8 +174,14 @@ def resolve(
     return found, problems
 
 
+MUTATION = re.compile(r"\bmutation\b", re.IGNORECASE)
+
+
 def graphql_client(token: str) -> GraphQL:
     def call(query: str, variables: Mapping[str, Any]) -> dict[str, Any]:
+        if MUTATION.search(query):
+            # Proposal only: refuse before any network access.
+            raise ValueError("refusing to send a GraphQL mutation (proposal only)")
         body = json.dumps({"query": query, "variables": dict(variables)}).encode()
         req = urllib.request.Request(
             API,
@@ -225,12 +215,12 @@ def sync(
     event: Mapping[str, Any],
     config: Mapping[str, Any],
     gql: GraphQL | None,
-    apply: bool,
     log: Callable[[str], None] = print,
 ) -> int:
+    """Log proposed board changes. Read-only: never writes to the board."""
     subj = subject(event)
     if subj is None:
-        log("no issue or pull_request in the event; nothing to do")
+        log("no issue in the event; nothing to do")
         return 0
     node_id, state, merged, labels = subj
     protected = config.get("protected_fields", [])
@@ -242,10 +232,11 @@ def sync(
         else {}
     )
     log(
-        f"plan: {json.dumps(wanted, ensure_ascii=False)} (state={state}, merged={merged})"
+        f"labels give: {json.dumps(wanted, ensure_ascii=False)} "
+        f"(state={state}, merged={merged})"
     )
     if gql is None:
-        log("no PROJECT_PAT available: plan only")
+        log("no PROJECT_PAT available: board not read, labels only")
         return 0
     proj = config["project"]
     data = gql(Q_PROJECT, {"login": proj["owner"], "number": int(proj["number"])})
@@ -254,7 +245,7 @@ def sync(
         log(
             f"project {proj['owner']}#{proj['number']} not found or not visible to the token"
         )
-        return 1 if apply else 0
+        return 0
     found, problems = resolve(wanted, project["fields"]["nodes"])
     for p in problems:
         log(f"::warning::{p}")
@@ -262,10 +253,10 @@ def sync(
     item = next((n for n in nodes if n["project"]["id"] == project["id"]), None)
     current = current_values(item) if item else {}
     guarded = {name.lower() for name in protected}
-    writes = []
-    for field, option, field_id, option_id in found:
+    proposals = []
+    for field, option, _field_id, _option_id in found:
         if field.lower() in guarded:  # defence in depth; desired_values skips them
-            log(f"::warning::refusing to write protected field {field!r}")
+            log(f"::warning::refusing to propose protected field {field!r}")
             continue
         verdict = decide(option, current.get(field.lower()), was.get(field))
         if verdict == NOOP:
@@ -273,36 +264,15 @@ def sync(
         elif verdict == MANUAL:
             log(
                 f"{field}: board shows {current.get(field.lower())!r} (manual edit), "
-                f"labels say {option!r}; manual value wins, not changed"
+                f"labels say {option!r}; manual value wins, no proposal"
             )
         else:
-            writes.append((field, option, field_id, option_id))
-    if not apply:
-        for field, option, _, _ in writes:
-            log(f"dry run: would set {field} = {option}")
-        if item is None and writes:
-            log("dry run: would add the item to the project")
-        log("dry run: set the repo variable PROJECT_SYNC=on to apply")
-        return 0
-    if not writes:
-        return 0
-    if item is None:
-        added = gql(M_ADD, {"project": project["id"], "content": node_id})
-        item_id = added["addProjectV2ItemById"]["item"]["id"]
-        log("added the item to the project")
-    else:
-        item_id = item["id"]
-    for field, option, field_id, option_id in writes:
-        gql(
-            M_SET,
-            {
-                "project": project["id"],
-                "item": item_id,
-                "field": field_id,
-                "option": option_id,
-            },
-        )
-        log(f"set {field} = {option}")
+            proposals.append((field, option))
+    if item is None and proposals:
+        log("proposal: add the item to the project")
+    for field, option in proposals:
+        log(f"proposal: set {field} = {option}")
+    log("proposal only: nothing was written to the board")
     return 0
 
 
@@ -312,13 +282,12 @@ def main() -> int:
     )
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     token = os.environ.get("PROJECT_PAT", "")
-    apply = os.environ.get("PROJECT_SYNC", "") == "on"
     gql = graphql_client(token) if token else None
     try:
-        return sync(event, config, gql, apply)
+        return sync(event, config, gql)
     except Exception as exc:  # noqa: BLE001 - one boundary; never print the token
-        print(f"::{'error' if apply else 'warning'}::project sync failed: {exc}")
-        return 1 if apply else 0
+        print(f"::warning::project sync proposal failed: {type(exc).__name__}")
+        return 0
 
 
 if __name__ == "__main__":
