@@ -1,0 +1,95 @@
+{
+  "id": "jerusalem",
+  "municipality": "עיריית ירושלים",
+  "municipality_en": "Jerusalem Municipality",
+  "city": "ירושלים",
+  "channel": {
+    "name": "פנייה ל-106 (טופס מקוון)",
+    "url": "https://www.jerusalem.muni.il/he/contactus/106/",
+    "hotline": "106 (מטלפון בתוך העיר), 02-5314600 (מנייד או מחוץ לעיר)",
+    "submission": "manual",
+    "automation_note": "Legacy manual field formatting only. Direct API preparation uses parking-report-106. Browser automation has been removed. API credentials and reporter details remain in private secrets/environment; live execution is gated."
+  },
+  "max_attachments": 3,
+  "attachment_types": [
+    "png",
+    "doc",
+    "pdf",
+    "tif",
+    "jpg",
+    "gif"
+  ],
+  "attachment_max_mb": 5,
+  "fields": [
+    {
+      "key": "first_name",
+      "label": "שם פרטי",
+      "required": true,
+      "source": "reporter"
+    },
+    {
+      "key": "last_name",
+      "label": "שם משפחה",
+      "required": true,
+      "source": "reporter"
+    },
+    {
+      "key": "id_type",
+      "label": "אמצעי זיהוי",
+      "required": true,
+      "source": "reporter",
+      "choices": [
+        "תעודת זהות",
+        "דרכון"
+      ]
+    },
+    {
+      "key": "id_number",
+      "label": "מספר זיהוי",
+      "required": true,
+      "source": "reporter"
+    },
+    {
+      "key": "phone",
+      "label": "מספר טלפון",
+      "required": true,
+      "source": "reporter"
+    },
+    {
+      "key": "phone2",
+      "label": "מספר טלפון נוסף",
+      "required": false,
+      "source": "reporter"
+    },
+    {
+      "key": "email",
+      "label": "דואר אלקטרוני",
+      "required": true,
+      "source": "reporter"
+    },
+    {
+      "key": "city",
+      "label": "יישוב",
+      "required": true,
+      "source": "config"
+    },
+    {
+      "key": "street",
+      "label": "רחוב",
+      "required": false,
+      "source": "car"
+    },
+    {
+      "key": "house_number",
+      "label": "מספר בית",
+      "required": false,
+      "source": "car"
+    },
+    {
+      "key": "description",
+      "label": "תוכן הפנייה",
+      "required": true,
+      "source": "report"
+    }
+  ]
+}
