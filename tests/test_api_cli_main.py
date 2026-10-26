@@ -103,14 +103,14 @@ class ApiCliMainTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             folder = Path(tmp) / "empty"
             folder.mkdir()
-            code, out = run([str(folder), "--addresses", str(Path(tmp) / "a.json")])
+            code, _out = run([str(folder), "--addresses", str(Path(tmp) / "a.json")])
             self.assertEqual(code, 4)
 
     def test_missing_reporter_env_is_blocked(self):
         with TemporaryDirectory() as tmp:
             folder, addresses = make_folder(tmp)
             env = {k: "" for k in ENV}
-            code, out = run([str(folder), "--addresses", str(addresses)], env=env)
+            code, _out = run([str(folder), "--addresses", str(addresses)], env=env)
             self.assertEqual(code, 4)
 
     def test_corrupted_hebrew_description_is_blocked(self):
@@ -119,7 +119,7 @@ class ApiCliMainTests(unittest.TestCase):
             record = json.loads((folder / "report.json").read_text(encoding="utf-8"))
             record["approved_description"] = "גרפיטי על קיר ברחוב".encode().decode("latin-1")
             (folder / "report.json").write_text(json.dumps(record), encoding="utf-8")
-            code, out = run([str(folder), "--addresses", str(addresses)])
+            code, _out = run([str(folder), "--addresses", str(addresses)])
             self.assertEqual(code, 4)
 
 

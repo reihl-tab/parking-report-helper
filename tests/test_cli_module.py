@@ -83,7 +83,7 @@ class CliModuleTests(unittest.TestCase):
             self.assertTrue(parsed)
 
     def test_intake_fixture(self):
-        code, out, err = run(["--intake", str(INTAKE_FIXTURE), "--city", "ירושלים"])
+        code, out, _err = run(["--intake", str(INTAKE_FIXTURE), "--city", "ירושלים"])
         self.assertEqual(code, 0)
         self.assertIn("חונה", out)
 
