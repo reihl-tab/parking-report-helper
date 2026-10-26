@@ -159,7 +159,9 @@ class SyncTests(unittest.TestCase):
             event(labels=["status: in-progress", "priority: high"]), gql
         )
         self.assertEqual(rc, 0)
-        self.assertEqual(proposals(out), [("Status", "In Progress"), ("Priority", "P1")])
+        self.assertEqual(
+            proposals(out), [("Status", "In Progress"), ("Priority", "P1")]
+        )
         self.assertIn("proposal only: nothing was written to the board", out)
         self.assertEqual(len(gql.calls), 2)  # project fields + item values, reads only
 
@@ -196,8 +198,12 @@ class ReadOnlyTests(unittest.TestCase):
 
     def test_no_mutation_in_module(self):
         source = (ROOT / "scripts/project_sync.py").read_text(encoding="utf-8")
-        for name in ("addProjectV2ItemById", "updateProjectV2ItemFieldValue",
-                     "clearProjectV2ItemFieldValue", "deleteProjectV2Item"):
+        for name in (
+            "addProjectV2ItemById",
+            "updateProjectV2ItemFieldValue",
+            "clearProjectV2ItemFieldValue",
+            "deleteProjectV2Item",
+        ):
             self.assertNotIn(name, source)
         for value in vars(ps).values():
             if isinstance(value, str):
@@ -206,8 +212,11 @@ class ReadOnlyTests(unittest.TestCase):
     def test_client_refuses_mutation_before_network(self):
         call = ps.graphql_client("synthetic-token")
         with mock.patch.object(ps.urllib.request, "urlopen") as urlopen:
-            for query in ("mutation { x }", "  Mutation($a: ID!) { x }",
-                          "query { a } mutation { b }"):
+            for query in (
+                "mutation { x }",
+                "  Mutation($a: ID!) { x }",
+                "query { a } mutation { b }",
+            ):
                 with self.subTest(query=query), self.assertRaises(ValueError):
                     call(query, {})
             urlopen.assert_not_called()
@@ -216,17 +225,22 @@ class ReadOnlyTests(unittest.TestCase):
         call = ps.graphql_client("synthetic-token")
         response = mock.MagicMock()
         response.__enter__.return_value = response
-        with mock.patch.object(ps.urllib.request, "urlopen", return_value=response), \
-                mock.patch.object(ps.json, "load", return_value={"data": {"ok": 1}}):
+        with (
+            mock.patch.object(ps.urllib.request, "urlopen", return_value=response),
+            mock.patch.object(ps.json, "load", return_value={"data": {"ok": 1}}),
+        ):
             self.assertEqual(call(ps.Q_PROJECT, {"login": "x", "number": 1}), {"ok": 1})
 
     def test_main_failure_never_echoes_exception_text(self):
         out = []
-        with mock.patch.object(ps, "sync", side_effect=RuntimeError("synthetic-secret")), \
-                mock.patch.dict(ps.os.environ, {"GITHUB_EVENT_PATH": str(ROOT / "x"),
-                                                "PROJECT_PAT": ""}), \
-                mock.patch.object(ps.Path, "read_text", return_value="{}"), \
-                mock.patch("builtins.print", side_effect=out.append):
+        with (
+            mock.patch.object(ps, "sync", side_effect=RuntimeError("synthetic-secret")),
+            mock.patch.dict(
+                ps.os.environ, {"GITHUB_EVENT_PATH": str(ROOT / "x"), "PROJECT_PAT": ""}
+            ),
+            mock.patch.object(ps.Path, "read_text", return_value="{}"),
+            mock.patch("builtins.print", side_effect=out.append),
+        ):
             self.assertEqual(ps.main(), 0)
         self.assertEqual(out, ["::warning::project sync proposal failed: RuntimeError"])
 
@@ -386,7 +400,7 @@ def workflow_triggers(text):
     lines = text.splitlines()
     start = next(i for i, ln in enumerate(lines) if re.fullmatch(r"on:\s*", ln))
     events = []
-    for ln in lines[start + 1:]:
+    for ln in lines[start + 1 :]:
         if ln and not ln[0].isspace() and not ln.startswith("#"):
             break
         m = re.fullmatch(r"  ([A-Za-z_]+):.*", ln)
@@ -405,7 +419,9 @@ class TokenTrustBoundaryTests(unittest.TestCase):
         )
 
     def test_trigger_parser(self):
-        sample = "name: x\non:\n  issues:\n    types: [opened]\n  pull_request:\n\njobs:\n"
+        sample = (
+            "name: x\non:\n  issues:\n    types: [opened]\n  pull_request:\n\njobs:\n"
+        )
         self.assertEqual(workflow_triggers(sample), ["issues", "pull_request"])
 
     def test_sync_runs_only_on_issue_events(self):
