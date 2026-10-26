@@ -7,6 +7,10 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if not (ROOT / ".github/project-sync.json").is_file():
+    # The Docker test stage copies src/tests/scripts/docs but not .github/;
+    # the sync is a repository workflow, covered by the regular test matrix.
+    raise unittest.SkipTest("repository .github/ not present (container build)")
 spec = importlib.util.spec_from_file_location(
     "project_sync", ROOT / "scripts/project_sync.py"
 )
