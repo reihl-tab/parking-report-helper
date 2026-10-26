@@ -1,9 +1,11 @@
 name: Sync labels to project board
 
-# Labels on issues/PRs are the source of truth; this mirrors them onto the
-# owner's project board (users/reihlinstinct/projects/2) so contributors
-# without board access stay in sync. Mapping: .github/project-sync.json.
-# Dry run (plan only) until the repo variable PROJECT_SYNC is "on".
+# Carries label/state changes on issues/PRs onto the owner's project board
+# (users/reihlinstinct/projects/6) so contributors without board access stay
+# in sync. Manual board edits win (compare-and-set); the curated Queue field
+# is never written. Mapping: .github/project-sync.json; design:
+# docs/PROJECT-SYNC.md. Dry run (plan only) until the repo variable
+# PROJECT_SYNC is "on".
 on:
   issues:
     types: [opened, reopened, closed, labeled, unlabeled]

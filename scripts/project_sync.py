@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Mirror issue/PR labels and state onto the owner's GitHub Project board.
+"""Propose issue/PR label and state changes to the owner's GitHub Project board.
 
-Labels on the issue are the source of truth; the board is a view of them.
+Labels are an input, not the source of truth: manual board edits win.
 Contributors without board access (Claude's sessions, forks) update labels,
-and this script, run by .github/workflows/project-sync.yml, sets the
-matching single-select fields (Status, Priority) on the project item.
+and this script, run by .github/workflows/project-sync.yml, carries a label
+or state change onto the matching single-select field (Status, Priority)
+only when the board still shows what the labels said before the change.
+Design note: docs/PROJECT-SYNC.md.
 
 Safe by default:
 - Dry run unless the repo variable PROJECT_SYNC is "on": it prints the plan
   and changes nothing.
+- Manual board values win: a field is written only when it is empty or
+  still equals the value derived from the labels *before* this event
+  (compare-and-set). Anything else is a manual edit and is left alone.
+- Protected fields (the curated Queue text) are never written.
 - Fields or options missing on the board are reported and skipped, never
   created.
 - Only stdlib; the token comes from the environment and is never printed.
@@ -41,8 +47,20 @@ query($login: String!, $number: Int!) {
 Q_ITEMS = """
 query($id: ID!) {
   node(id: $id) {
-    ... on Issue { projectItems(first: 50) { nodes { id project { id } } } }
-    ... on PullRequest { projectItems(first: 50) { nodes { id project { id } } } }
+    ... on Issue { projectItems(first: 50) { nodes { ...item } } }
+    ... on PullRequest { projectItems(first: 50) { nodes { ...item } } }
+  }
+}
+fragment item on ProjectV2Item {
+  id
+  project { id }
+  fieldValues(first: 50) {
+    nodes {
+      ... on ProjectV2ItemFieldSingleSelectValue {
+        name
+        field { ... on ProjectV2SingleSelectField { name } }
+      }
+    }
   }
 }"""
 M_ADD = """
@@ -61,9 +79,15 @@ mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
 
 GraphQL = Callable[[str, Mapping[str, Any]], dict[str, Any]]
 
+SET, NOOP, MANUAL = "set", "noop", "manual"
+
 
 def desired_values(
-    state: str, merged: bool, labels: Iterable[str], fields: Mapping[str, Any]
+    state: str,
+    merged: bool,
+    labels: Iterable[str],
+    fields: Mapping[str, Any],
+    protected: Iterable[str] = (),
 ) -> dict[str, str]:
     """Board field -> option name, from the configured rules.
 
@@ -72,8 +96,11 @@ def desired_values(
     match nothing and that has no `default` is left unchanged."""
     names = {label.lower() for label in labels}
     effective = "merged" if merged else state.lower()
+    guarded = {name.lower() for name in protected}
     out: dict[str, str] = {}
     for field, spec in fields.items():
+        if field.lower() in guarded:
+            continue
         for rule in spec.get("rules", []):
             if "state" in rule and rule["state"] in (effective, state.lower()):
                 out[field] = rule["option"]
@@ -84,6 +111,55 @@ def desired_values(
         else:
             if spec.get("default"):
                 out[field] = spec["default"]
+    return out
+
+
+def previous_subject(
+    event: Mapping[str, Any], state: str, merged: bool, labels: list[str]
+) -> tuple[str, bool, list[str]] | None:
+    """(state, merged, labels) just before this event, or None when unknown.
+
+    Only label and close/reopen events have a known "before"; for anything
+    else (opened, edited, ...) the sync may fill empty fields but never
+    overwrite a value it cannot prove it set itself."""
+    action = event.get("action")
+    label = (event.get("label") or {}).get("name")
+    if action == "labeled" and label:
+        return state, merged, [n for n in labels if n.lower() != label.lower()]
+    if action == "unlabeled" and label:
+        return state, merged, [*labels, label]
+    if action == "closed":
+        return "open", False, labels
+    if action == "reopened":
+        return "closed", False, labels
+    return None
+
+
+def decide(desired: str, current: str | None, previous: str | None) -> str:
+    """Compare-and-set: manual board values win.
+
+    - board already shows the desired option -> NOOP
+    - field is empty -> SET
+    - board still shows what the labels said before this event -> SET
+    - anything else was edited by hand -> MANUAL (left alone)"""
+    if current is not None and current.lower() == desired.lower():
+        return NOOP
+    if current is None:
+        return SET
+    if previous is not None and current.lower() == previous.lower():
+        return SET
+    return MANUAL
+
+
+def current_values(item: Mapping[str, Any]) -> dict[str, str]:
+    """Board field name (lower-case) -> current single-select option name."""
+    out: dict[str, str] = {}
+    for node in (item.get("fieldValues") or {}).get("nodes") or []:
+        if not node or node.get("name") is None:
+            continue
+        field = (node.get("field") or {}).get("name")
+        if field:
+            out[field.lower()] = node["name"]
     return out
 
 
@@ -157,7 +233,14 @@ def sync(
         log("no issue or pull_request in the event; nothing to do")
         return 0
     node_id, state, merged, labels = subj
-    wanted = desired_values(state, merged, labels, config["fields"])
+    protected = config.get("protected_fields", [])
+    wanted = desired_values(state, merged, labels, config["fields"], protected)
+    before = previous_subject(event, state, merged, labels)
+    was = (
+        desired_values(*before, config["fields"], protected)
+        if before is not None
+        else {}
+    )
     log(
         f"plan: {json.dumps(wanted, ensure_ascii=False)} (state={state}, merged={merged})"
     )
@@ -175,20 +258,41 @@ def sync(
     found, problems = resolve(wanted, project["fields"]["nodes"])
     for p in problems:
         log(f"::warning::{p}")
+    nodes = gql(Q_ITEMS, {"id": node_id})["node"]["projectItems"]["nodes"]
+    item = next((n for n in nodes if n["project"]["id"] == project["id"]), None)
+    current = current_values(item) if item else {}
+    guarded = {name.lower() for name in protected}
+    writes = []
+    for field, option, field_id, option_id in found:
+        if field.lower() in guarded:  # defence in depth; desired_values skips them
+            log(f"::warning::refusing to write protected field {field!r}")
+            continue
+        verdict = decide(option, current.get(field.lower()), was.get(field))
+        if verdict == NOOP:
+            log(f"{field} already {option}")
+        elif verdict == MANUAL:
+            log(
+                f"{field}: board shows {current.get(field.lower())!r} (manual edit), "
+                f"labels say {option!r}; manual value wins, not changed"
+            )
+        else:
+            writes.append((field, option, field_id, option_id))
     if not apply:
-        for field, option, _, _ in found:
+        for field, option, _, _ in writes:
             log(f"dry run: would set {field} = {option}")
+        if item is None and writes:
+            log("dry run: would add the item to the project")
         log("dry run: set the repo variable PROJECT_SYNC=on to apply")
         return 0
-    nodes = gql(Q_ITEMS, {"id": node_id})["node"]["projectItems"]["nodes"]
-    item_id = next(
-        (n["id"] for n in nodes if n["project"]["id"] == project["id"]), None
-    )
-    if item_id is None:
+    if not writes:
+        return 0
+    if item is None:
         added = gql(M_ADD, {"project": project["id"], "content": node_id})
         item_id = added["addProjectV2ItemById"]["item"]["id"]
         log("added the item to the project")
-    for field, option, field_id, option_id in found:
+    else:
+        item_id = item["id"]
+    for field, option, field_id, option_id in writes:
         gql(
             M_SET,
             {

@@ -1,6 +1,7 @@
 {
-  "_comment": "Labels -> board fields for scripts/project_sync.py. Option names must match the board (case-insensitive); unmatched ones are warned and skipped. First matching rule wins.",
-  "project": {"owner": "reihlinstinct", "number": 2},
+  "_comment": "Labels -> board fields for scripts/project_sync.py (design: docs/PROJECT-SYNC.md). Option names must match the board (case-insensitive); unmatched ones are warned and skipped, never created. First matching rule wins. Manual board values win (compare-and-set). Protected fields are never written. UNVERIFIED: the Status option names below have not been checked against Project 6; confirm them before PROJECT_SYNC=on.",
+  "project": {"owner": "reihlinstinct", "number": 6},
+  "protected_fields": ["Queue"],
   "fields": {
     "Status": {
       "rules": [
@@ -15,9 +16,8 @@
     },
     "Priority": {
       "rules": [
-        {"label": "priority: high", "option": "High"},
-        {"label": "priority: medium", "option": "Medium"},
-        {"label": "priority: low", "option": "Low"}
+        {"label": "priority: high", "option": "P1"},
+        {"label": "priority: medium", "option": "P2"}
       ]
     }
   }
