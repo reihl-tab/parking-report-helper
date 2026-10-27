@@ -18,10 +18,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from test_api_cli_main import make_folder, run  # type: ignore[import-not-found]
+
 from parking_report import api106
 from parking_report.ledger import GitLedger, LedgerError
-
-from test_api_cli_main import make_folder, run  # type: ignore[import-not-found]
 
 SECRET = "ZZ-DO-NOT-ECHO"
 FAILURES = {
@@ -69,9 +69,11 @@ class LedgerGitTests(unittest.TestCase):
         for name, outcome in FAILURES.items():
             with self.subTest(name), tempfile.TemporaryDirectory() as tmp:
                 ledger = GitLedger(Path(tmp))
-                with patch("parking_report.ledger.subprocess.run", fake_run(outcome)):
-                    with self.assertRaises(LedgerError) as ctx:
-                        ledger.git("status")
+                with (
+                    patch("parking_report.ledger.subprocess.run", fake_run(outcome)),
+                    self.assertRaises(LedgerError) as ctx,
+                ):
+                    ledger.git("status")
                 self.assertNotIn(SECRET, str(ctx.exception))
                 # No chained raw exception for a traceback to print.
                 self.assertIsNone(ctx.exception.__cause__)
@@ -130,26 +132,26 @@ class StatePersistenceTests(unittest.TestCase):
             return SimpleNamespace(returncode=1 if command[1] == "push" else 0)
 
         api = self.Fake()
-        with self.assertRaises(api106.ReviewNeeded):
-            with (
-                tempfile.TemporaryDirectory() as tmp,
-                patch.dict(os.environ, {"PARKING_STATE_GIT": "1"}),
-                patch.object(api106.subprocess, "run", run_),
-            ):
-                api106.submit(api, {}, {}, b"jpeg", "d" * 64, Path(tmp))
+        with (
+            self.assertRaises(api106.ReviewNeeded),
+            tempfile.TemporaryDirectory() as tmp,
+            patch.dict(os.environ, {"PARKING_STATE_GIT": "1"}),
+            patch.object(api106.subprocess, "run", run_),
+        ):
+            api106.submit(api, {}, {}, b"jpeg", "d" * 64, Path(tmp))
         self.assertFalse(api.created)
 
     def test_every_failure_maps_to_review_needed_before_create(self):
         for name, outcome in FAILURES.items():
             with self.subTest(name):
                 api = self.Fake()
-                with self.assertRaises(api106.ReviewNeeded) as ctx:
-                    with (
-                        tempfile.TemporaryDirectory() as tmp,
-                        patch.dict(os.environ, {"PARKING_STATE_GIT": "1"}),
-                        patch.object(api106.subprocess, "run", fake_run(outcome)),
-                    ):
-                        api106.submit(api, {}, {}, b"jpeg", "d" * 64, Path(tmp))
+                with (
+                    self.assertRaises(api106.ReviewNeeded) as ctx,
+                    tempfile.TemporaryDirectory() as tmp,
+                    patch.dict(os.environ, {"PARKING_STATE_GIT": "1"}),
+                    patch.object(api106.subprocess, "run", fake_run(outcome)),
+                ):
+                    api106.submit(api, {}, {}, b"jpeg", "d" * 64, Path(tmp))
                 self.assertFalse(api.created)
                 self.assertNotIn(SECRET, str(ctx.exception))
 
