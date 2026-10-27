@@ -30,13 +30,21 @@ class GitLedger:
         self.data: dict[str, Any] = {}
 
     def git(self, *args: str) -> str:
-        result = subprocess.run(
-            ["git", *args],
-            cwd=self.root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        # check=False: the return code is inspected below and mapped to
+        # LedgerError. A git that cannot start (OSError) or a SubprocessError
+        # is the same failure, never a raw exception; its text is withheld.
+        try:
+            result = subprocess.run(
+                ["git", *args],
+                cwd=self.root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            raise LedgerError(
+                "Private ledger Git operation failed; reconcile before retrying"
+            ) from None
         if result.returncode:
             raise LedgerError(
                 "Private ledger Git operation failed; reconcile before retrying"
