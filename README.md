@@ -4,7 +4,7 @@
 [![Last commit](https://img.shields.io/github/last-commit/reihlinstinct/parking-report-helper)](https://github.com/reihlinstinct/parking-report-helper/commits/main)
 [![Open issues](https://img.shields.io/github/issues/reihlinstinct/parking-report-helper)](https://github.com/reihlinstinct/parking-report-helper/issues)
 [![Closed PRs](https://img.shields.io/github/issues-pr-closed/reihlinstinct/parking-report-helper)](https://github.com/reihlinstinct/parking-report-helper/pulls?q=is%3Apr+is%3Aclosed)
-[![Python 3.10-3.13](https://img.shields.io/badge/python-3.10%20to%203.13-blue?logo=python&logoColor=white)](pyproject.toml)
+[![Python 3.11-3.13](https://img.shields.io/badge/python-3.11%20to%203.13-blue?logo=python&logoColor=white)](pyproject.toml)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License: MIT](https://img.shields.io/github/license/reihlinstinct/parking-report-helper)](LICENSE)
 [![Reports filed](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Freihlinstinct%2Fparking-report-helper%2Fbadge-data%2Freports.json)](docs/API106.md)
@@ -106,7 +106,7 @@ only).
 
 ## Requirements
 
-Python 3.10 or later, or Docker. The core CLI has no third-party dependencies; the
+Python 3.11 or later, or Docker. The core CLI has no third-party dependencies; the
 API runner uses the `api` extra.
 
 ## Install and run
@@ -239,7 +239,7 @@ Live submission runs only in the private repository, per approved report.
 
 ## Continuous integration
 
-GitHub Actions runs the suite on Python 3.10 to 3.13 for every push and pull request.
+GitHub Actions runs the suite on Python 3.11 to 3.13 for every push and pull request.
 A separate job builds the Docker image, runs the tests inside it, and smoke-tests the
 container. Nothing is published. Workflows use read-only repository permissions and
 need no secrets.

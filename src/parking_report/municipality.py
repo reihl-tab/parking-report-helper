@@ -27,7 +27,7 @@ def load_config(name_or_path: str) -> dict[str, Any]:
             text = (
                 resources.files("parking_report")
                 # One segment per call: Traversable.joinpath takes several
-                # segments only from Python 3.11 (we support 3.10).
+                # segments only from Python 3.11.
                 .joinpath("configs")
                 .joinpath(f"{name_or_path}.json")
                 .read_text(encoding="utf-8")

@@ -5,7 +5,6 @@ Every image is generated in memory. No real photos, no network.
 
 import io
 import re
-import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -113,31 +112,50 @@ class ReadPictureTests(unittest.TestCase):
             self.read(bomb, "photo.png")
 
 
-PYPROJECT = Path(__file__).resolve().parents[1] / "pyproject.toml"
+ROOT = Path(__file__).resolve().parents[1]
+PYPROJECT = ROOT / "pyproject.toml"
 
 
-class PillowBoundTests(unittest.TestCase):
-    """The [api] extra must admit the patched Pillow and exclude 12.x (#109)."""
+class SupportedPythonTests(unittest.TestCase):
+    """Python 3.10 is dropped so no supported runtime resolves 12.x (#109, #122)."""
 
-    def pillow_entries(self):
-        if not PYPROJECT.exists():  # the Docker test stage copies tests/ only
-            self.skipTest("pyproject.toml is not in this layout")
-        text = PYPROJECT.read_text()
-        block = re.search(r"^api = \[(.*?)^\]", text, re.DOTALL | re.MULTILINE)
-        self.assertIsNotNone(block)
-        entries = re.findall(r'^\s*"([^"]+)"', block.group(1), re.MULTILINE)
-        return [e for e in entries if e.lower().startswith("pillow")]
+    def source_file(self, name):
+        path = ROOT / name
+        if not path.exists():  # the Docker test stage copies tests/ only
+            self.skipTest(f"{name} is not in this layout")
+        return path.read_text(encoding="utf-8")
 
-    def test_supported_pythons_get_the_patched_major(self):
-        self.assertEqual(
-            self.pillow_entries(),
-            [
-                "Pillow>=13,<14; python_version >= '3.11'",
-                "Pillow>=11.3,<13; python_version < '3.11'",
-            ],
+    def api_entries(self):
+        block = re.search(
+            r"^api = \[(.*?)^\]",
+            self.source_file("pyproject.toml"),
+            re.DOTALL | re.MULTILINE,
         )
+        self.assertIsNotNone(block)
+        return re.findall(r'^\s*"([^"]+)"', block.group(1), re.MULTILINE)
 
-    @unittest.skipIf(sys.version_info < (3, 11), "no patched Pillow exists for 3.10")
+    def test_requires_python_is_311_or_later(self):
+        text = self.source_file("pyproject.toml")
+        self.assertIn('requires-python = ">=3.11"', text)
+        self.assertIn('python_version = "3.11"', text)  # mypy target
+
+    def test_pillow_has_one_patched_range_without_a_fallback(self):
+        pillow = [e for e in self.api_entries() if e.lower().startswith("pillow")]
+        self.assertEqual(pillow, ["Pillow>=13,<14"])
+
+    def test_ci_matrix_starts_at_311(self):
+        text = self.source_file(".github/workflows/tests.yml")
+        self.assertIn("python-version: ['3.11', '3.12', '3.13']", text)
+        self.assertNotIn("3.10", text)
+
+    def test_docker_bases_are_supported_pythons(self):
+        for name in ("Dockerfile", "Dockerfile.render"):
+            bases = re.findall(
+                r"^FROM python:3\.(\d+)", self.source_file(name), re.MULTILINE
+            )
+            self.assertTrue(bases, name)
+            self.assertTrue(all(int(minor) >= 11 for minor in bases), name)
+
     def test_installed_pillow_is_patched(self):
         import PIL
 
