@@ -322,5 +322,57 @@ class SuccessOutputTest(unittest.TestCase):
         self.assertEqual(err, "")
 
 
+def github_anchor(heading: str) -> str:
+    """GitHub-style heading slug: lower-case, punctuation dropped, spaces to -."""
+    slug = re.sub(r"[^\w\- ]", "", heading.strip().lower())
+    return slug.replace(" ", "-")
+
+
+class PolicyDocTest(unittest.TestCase):
+    """The adopted flag-stability policy (#73, decision 6433915118)."""
+
+    def setUp(self) -> None:
+        self.text = DOC.read_text(encoding="utf-8")
+
+    def test_in_doc_anchors_resolve(self) -> None:
+        anchors = {
+            github_anchor(m.group(1))
+            for m in re.finditer(r"^#{1,6} (.+)$", self.text, re.MULTILINE)
+        }
+        links = re.findall(r"\]\(#([^)]+)\)", self.text)
+        self.assertTrue(links)
+        for link in links:
+            self.assertIn(link, anchors)
+
+    def test_policy_records_the_maintainer_caveats(self) -> None:
+        section = self.text.split("## Flag-stability policy", 1)[1]
+        self.assertNotIn("not adopted", self.text.lower())
+        for clause in (
+            "**minor** version bump",
+            "**major** bump",
+            "at least\n   one released minor version",
+            "**Additive changes.** A new flag, exit code or JSON key is not exempt",
+            "fail closed immediately",
+            "never kept working just to honour a deprecation",
+            "never weakens an existing safety or approval",
+            "`CHANGELOG.md` entry",
+            # Each obligation of decision 6433915118, pinned one by one.
+            "states the\n   compatibility impact and the migration, updates this file",
+            "announced\n   as a deprecation first",
+            "needs a contract update, tests, a `CHANGELOG.md` entry and the right\n   semver bump",
+            "The PR documents the exception and the migration.",
+        ):
+            self.assertIn(clause, section)
+
+    @unittest.skipUnless(
+        (ROOT / "pyproject.toml").exists(),
+        "source checkout only; the Docker test stage copies docs/ but not CHANGELOG.md",
+    )
+    def test_changelog_exists_and_links_back(self) -> None:
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("docs/CLI-CONTRACT.md#flag-stability-policy", changelog)
+        self.assertIn("## Unreleased", changelog)
+
+
 if __name__ == "__main__":
     unittest.main()

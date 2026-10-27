@@ -4,8 +4,8 @@ Issue #73. This file **documents what the three entry points do today**. It
 doesn't change them. `tests/test_cli_contract.py` loads the JSON block below
 and checks it against the real parsers and exit paths. Changing a flag, a
 default or an exit code without updating this file fails CI. The package
-version is `0.2.0`, so nothing here is a stability promise yet; see
-[Proposed policy](#proposed-policy-not-adopted).
+version is `0.2.0`. Changes to this contract follow the
+[flag-stability policy](#flag-stability-policy).
 
 ## Machine-readable contract
 
@@ -78,13 +78,34 @@ version is `0.2.0`, so nothing here is a stability promise yet; see
 1. `--json` isn't available everywhere. `parking-report` has it only with `--municipality`; plain report text has no JSON mode.
 2. Exit codes aren't shared across commands: `1` means input error in `parking-report`, and `4` means blocked in `parking-report-106`.
 3. `parking-report-106`'s `prog` comes from `sys.argv[0]`, and its parser is built inside `main()`, not a `build_parser()`.
-4. There's no CHANGELOG entry policy for flag changes.
+4. Resolved by the [flag-stability policy](#flag-stability-policy): flag changes need a `CHANGELOG.md` entry.
 
-## Proposed policy (not adopted)
+## Flag-stability policy
 
-This is a proposal for the owner to decide on; it isn't in force yet.
-- The CLI is the supported operator API.
-- Removing or renaming a flag, changing a default or changing an exit code needs a minor version bump before 1.0 and a major one after, plus a CHANGELOG line and an update to this file.
-- Adding a flag needs only an update to this file.
-- Deprecated flags (currently `--approved-category-routing`) keep working for at least one minor release after the deprecation is announced.
-- `--json` for plain report output, and a shared exit-code table, would be separate follow-up PRs.
+Adopted by the maintainer in #73 (decision 6433915118). It applies to the
+flags, defaults, exit codes and JSON keys in the block above.
+
+1. **Supported API.** The CLI and this contract are the supported operator
+   API.
+2. **Breaking changes.** Removing or renaming a flag, or changing a default,
+   an exit code or a documented JSON key, needs a **minor** version bump
+   before 1.0 and a **major** bump from 1.0 on. The same PR states the
+   compatibility impact and the migration, updates this file and adds a
+   `CHANGELOG.md` entry.
+3. **Deprecation before removal.** A normal removal or rename is announced
+   as a deprecation first, and the old behaviour keeps working for at least
+   one released minor version. `--approved-category-routing` is deprecated
+   today.
+4. **Additive changes.** A new flag, exit code or JSON key is not exempt. It
+   needs a contract update, tests, a `CHANGELOG.md` entry and the right
+   semver bump.
+5. **Security and privacy exception.** When keeping the old behaviour would
+   keep an exposure, a fix may fail closed immediately, without the
+   deprecation period. The PR documents the exception and the migration. A
+   dangerous flag is never kept working just to honour a deprecation.
+6. **Gates stay.** This policy never weakens an existing safety or approval
+   gate (for example live-submission enablement, the exact reviewed digest,
+   or the durable ledger).
+
+Follow-ups that need their own PRs: `--json` for plain report output, and a
+shared exit-code table.
