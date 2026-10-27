@@ -11,7 +11,14 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-api = ["Pillow>=11.3,<13", "pyproj>=3.6,<4", "filelock>=3.13,<5"]
+api = [
+    # Pillow 13.0.0 is the first release with the fixes for the advisories in
+    # #109 and requires Python >= 3.11. Python 3.10 has no patched release.
+    "Pillow>=13,<14; python_version >= '3.11'",
+    "Pillow>=11.3,<13; python_version < '3.11'",
+    "pyproj>=3.6,<4",
+    "filelock>=3.13,<5",
+]
 
 
 [project.scripts]
