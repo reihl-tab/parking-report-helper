@@ -273,3 +273,5 @@ for the CSV schema, counting limits and review requirement.
 Historical regression coverage: [batch 1 audit](docs/HISTORICAL-REGRESSIONS.md).
 
 CI test/coverage results appear in [GitHub job summaries](docs/CI-TEST-SUMMARIES.md).
+
+CI trigger overlap and runner-time measurements: [CI efficiency audit](docs/CI-EFFICIENCY.md) (measure-only, #124).
