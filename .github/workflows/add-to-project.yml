@@ -1,9 +1,12 @@
 name: Add new items to project
 
+# Issues only. Issue events always run this file from the default branch, so
+# no pull request can change the job that receives PROJECT_PAT. There is
+# deliberately no pull_request / pull_request_target trigger, so PRs are not
+# added as separate board items; a PR is followed from its linked issue
+# (fixes #N). See CONTRIBUTING.md and tests/test_workflow_secret_boundary.py.
 on:
   issues:
-    types: [opened]
-  pull_request:
     types: [opened]
 
 permissions: {}

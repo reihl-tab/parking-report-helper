@@ -22,3 +22,5 @@ The same scheme is used in every public repo. Do not add parallel label schemes.
 2. Within a milestone, take `priority: high` first, then medium, then low. Prefer `good first issue` if you are new.
 3. Skip anything with `status: blocked`, `status: held` or `status: in-progress`.
 4. Comment "taking this" on the issue, then work from a fork and open a PR that references it.
+
+**Project board.** New issues are added to the board automatically. Pull requests are not: the board workflow runs on issue events only, so no pull request can change the job that holds the board token (see #119). Referencing an issue (`fixes #N`) does not add the PR to the board as a separate item; it only lets readers follow the linked PR from the issue's card.
