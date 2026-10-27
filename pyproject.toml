@@ -7,15 +7,14 @@ name = "parking-report-helper"
 version = "0.2.0"
 description = "Turn a JSON list of vehicles into Hebrew parking-violation report drafts."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
 api = [
     # Pillow 13.0.0 is the first release with the fixes for the advisories in
-    # #109 and requires Python >= 3.11. Python 3.10 has no patched release.
-    "Pillow>=13,<14; python_version >= '3.11'",
-    "Pillow>=11.3,<13; python_version < '3.11'",
+    # #109; it requires Python >= 3.11, hence requires-python above (#122).
+    "Pillow>=13,<14",
     "pyproj>=3.6,<4",
     "filelock>=3.13,<5",
 ]
@@ -36,5 +35,5 @@ parking_report = ["configs/*.json"]
 # Issue #65: src type-checks clean. Third-party packages from the [api] extra
 # ship their own type information, so no blanket ignore_missing_imports.
 files = ["src"]
-python_version = "3.10"
+python_version = "3.11"
 warn_unused_configs = true

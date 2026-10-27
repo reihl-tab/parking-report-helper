@@ -72,7 +72,7 @@ needed unless the form has widgets that labels or selectors cannot reach.
 
 Unit and functional CLI tests cover drafts, intake, API validation and uncertain
 creation/duplicate guards. Registry tests use mocked government responses. Generated
-photos and synthetic identities replace real data. CI runs Python 3.10-3.13 and
+photos and synthetic identities replace real data. CI runs Python 3.11-3.13 and
 Docker builds. Browser form/mock tests and live probes have been removed.
 No municipality requests occur in tests. docs/API106.md owns API/state semantics.
 
