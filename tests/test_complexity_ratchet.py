@@ -17,7 +17,11 @@ import ast
 import unittest
 from pathlib import Path
 
-SRC = Path(__file__).resolve().parents[1] / "src" / "parking_report"
+import parking_report
+
+# The installed package, so this also runs in the Docker test image, which
+# has the package installed but no src/ tree.
+SRC = Path(parking_report.__file__).resolve().parent
 LIMIT = 20  # radon rank C is 11-20; D starts at 21
 
 # (file relative to src/parking_report, block name): highest allowed score.
