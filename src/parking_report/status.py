@@ -43,77 +43,92 @@ def _safe(value: str) -> str:
     return re.sub(r"([\\`*_{}\[\]()!|])", r"\\\1", value)
 
 
-def status_draft(rows: Iterable[Mapping[str, str]], as_of: str) -> str:
-    """A current explicit no-reply check is required; absent fields mean unknown."""
-    today = _day(as_of)
-    reports = []
-    ids: set[str] = set()
-    refs: set[str] = set()
-    for raw in rows:
-        if not REQUIRED.issubset(raw):
-            raise ValueError("Missing ledger columns")
-        row = {key: raw.get(key, "") for key in TEXT_FIELDS}
-        for value in row.values():
-            if not isinstance(value, str) or any(
-                ord(c) < 32
-                or 127 <= ord(c) <= 159
-                or c in "\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
-                for c in value
-            ):
-                raise ValueError("Unsafe ledger value")
-        if not all(row[key].strip() for key in ("folder_id", "street", "event_type")):
-            raise ValueError("Missing report identity")
-        filed = _day(row["filed_date"])
-        if filed > today:
-            raise ValueError("Future filing date")
-        if row["folder_id"] in ids:
-            raise ValueError("Duplicate report ID")
-        ids.add(row["folder_id"])
-        ref = row["municipal_ref"].strip()
-        if ref and (not re.fullmatch(r"[0-9]+(?:-[0-9]+)?", ref) or ref in refs):
-            raise ValueError("Invalid or duplicate reference")
-        if ref:
-            refs.add(ref)
-        row["municipal_ref"] = ref
-        response = row["municipal_response"] or "unknown"
-        if response not in {"unknown", "no_reply", "received"}:
-            raise ValueError("Unknown response status")
-        checked = (
-            _day(row["response_checked_at"]) if row["response_checked_at"] else None
-        )
-        if checked and not filed <= checked <= today:
-            raise ValueError("Invalid response check date")
-        if response != "unknown" and (
-            not checked or not row["response_evidence"].strip()
+Report = tuple[dict[str, str], str, int, bool, bool]
+
+
+def _validate_row(
+    raw: Mapping[str, str], today: date, ids: set[str], refs: set[str]
+) -> tuple[dict[str, str], date, date | None, date | None]:
+    """Validate one ledger row; record its ID and reference in ``ids``/``refs``.
+
+    Returns the normalised row (stripped municipal_ref) with its filing,
+    response-check and last-reminder dates. Raises ValueError on bad input.
+    """
+    if not REQUIRED.issubset(raw):
+        raise ValueError("Missing ledger columns")
+    row = {key: raw.get(key, "") for key in TEXT_FIELDS}
+    for value in row.values():
+        if not isinstance(value, str) or any(
+            ord(c) < 32
+            or 127 <= ord(c) <= 159
+            or c in "\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+            for c in value
         ):
-            raise ValueError("Response state requires checked date and source evidence")
-        reminded = _day(row["last_reminder_at"]) if row["last_reminder_at"] else None
-        if reminded and not filed <= reminded <= today:
-            raise ValueError("Invalid reminder date")
-        age = (today - filed).days
-        mapping = (
-            row["ref_mapping"] == "verified_receipt"
-            and bool(ref)
-            and bool(row["receipt_evidence"].strip())
-        )
-        due = False
-        if response == "received":
-            status = "מענה מתועד"
-        elif response == "unknown":
-            status = "מענה לא נבדק"
-        elif checked != today:
-            status = "נדרשת בדיקת מענה עדכנית"
-        elif age < REMINDER_DAYS:
-            status = "טרם חלף שבוע"
-        elif reminded and reminded >= checked:
-            status = "כבר נשלחה תזכורת לפי הבדיקה הנוכחית"
-        elif not mapping:
-            status = "חלף שבוע; שיוך הפנייה דורש אימות"
-        else:
-            status = "מועמד לתזכורת; נדרש אישור"
-            due = True
-        reports.append((row, status, age, mapping, due))
-    reports.sort(key=lambda item: (item[0]["filed_date"], item[0]["folder_id"]))
+            raise ValueError("Unsafe ledger value")
+    if not all(row[key].strip() for key in ("folder_id", "street", "event_type")):
+        raise ValueError("Missing report identity")
+    filed = _day(row["filed_date"])
+    if filed > today:
+        raise ValueError("Future filing date")
+    if row["folder_id"] in ids:
+        raise ValueError("Duplicate report ID")
+    ids.add(row["folder_id"])
+    ref = row["municipal_ref"].strip()
+    if ref and (not re.fullmatch(r"[0-9]+(?:-[0-9]+)?", ref) or ref in refs):
+        raise ValueError("Invalid or duplicate reference")
+    if ref:
+        refs.add(ref)
+    row["municipal_ref"] = ref
+    response = row["municipal_response"] or "unknown"
+    if response not in {"unknown", "no_reply", "received"}:
+        raise ValueError("Unknown response status")
+    checked = _day(row["response_checked_at"]) if row["response_checked_at"] else None
+    if checked and not filed <= checked <= today:
+        raise ValueError("Invalid response check date")
+    if response != "unknown" and (not checked or not row["response_evidence"].strip()):
+        raise ValueError("Response state requires checked date and source evidence")
+    reminded = _day(row["last_reminder_at"]) if row["last_reminder_at"] else None
+    if reminded and not filed <= reminded <= today:
+        raise ValueError("Invalid reminder date")
+    return row, filed, checked, reminded
+
+
+def _classify_status(
+    row: Mapping[str, str],
+    filed: date,
+    checked: date | None,
+    reminded: date | None,
+    today: date,
+) -> tuple[str, int, bool, bool]:
+    """Return (status label, age in days, verified mapping, reminder due)."""
+    response = row["municipal_response"] or "unknown"
+    age = (today - filed).days
+    mapping = (
+        row["ref_mapping"] == "verified_receipt"
+        and bool(row["municipal_ref"])
+        and bool(row["receipt_evidence"].strip())
+    )
+    due = False
+    if response == "received":
+        status = "מענה מתועד"
+    elif response == "unknown":
+        status = "מענה לא נבדק"
+    elif checked != today:
+        status = "נדרשת בדיקת מענה עדכנית"
+    elif age < REMINDER_DAYS:
+        status = "טרם חלף שבוע"
+    elif reminded and reminded >= checked:
+        status = "כבר נשלחה תזכורת לפי הבדיקה הנוכחית"
+    elif not mapping:
+        status = "חלף שבוע; שיוך הפנייה דורש אימות"
+    else:
+        status = "מועמד לתזכורת; נדרש אישור"
+        due = True
+    return status, age, mapping, due
+
+
+def _format_output(reports: list[Report], as_of: str) -> str:
+    """Render the sorted reports as the private Markdown status draft."""
     lines = [
         f"# טיוטת מצב פרטית ליום {as_of}",
         "",
@@ -158,6 +173,22 @@ def status_draft(rows: Iterable[Mapping[str, str]], as_of: str) -> str:
             f"שלום, אבקש עדכון על פנייה {row['municipal_ref']} שנפתחה בתאריך {row['filed_date']}. תודה.",
         ]
     return "\n".join(lines) + "\n"
+
+
+def status_draft(rows: Iterable[Mapping[str, str]], as_of: str) -> str:
+    """A current explicit no-reply check is required; absent fields mean unknown."""
+    today = _day(as_of)
+    reports: list[Report] = []
+    ids: set[str] = set()
+    refs: set[str] = set()
+    for raw in rows:
+        row, filed, checked, reminded = _validate_row(raw, today, ids, refs)
+        status, age, mapping, due = _classify_status(
+            row, filed, checked, reminded, today
+        )
+        reports.append((row, status, age, mapping, due))
+    reports.sort(key=lambda item: (item[0]["filed_date"], item[0]["folder_id"]))
+    return _format_output(reports, as_of)
 
 
 def main(argv: list[str] | None = None) -> int:
