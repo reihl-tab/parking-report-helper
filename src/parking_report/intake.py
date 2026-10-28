@@ -34,8 +34,14 @@ def _text(value: object) -> str:
     return str(value).strip() if value is not None else ""
 
 
-def record_to_car(record: object) -> dict[str, str]:
-    """Map one record to the car mapping used by report.py. Raises ValueError if not usable."""
+def _validate_record(
+    record: object,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str, str]:
+    """Check one intake record is ready and addressed. Raises ValueError if not.
+
+    Returns (record, violation, address, street, house_number), the record
+    narrowed to a dict; a non-dict violation or address is treated as empty.
+    """
     if not isinstance(record, dict):
         raise ValueError("record must be a JSON object")  # noqa: TRY004 - malformed input data; callers catch ValueError or broadly
     if record.get("schema_version") != SCHEMA_VERSION:
@@ -62,14 +68,20 @@ def record_to_car(record: object) -> dict[str, str]:
         raise ValueError(
             "address.house_number is missing; confirm a number or research the nearest numbered address and mark it approximate"
         )
-    from .subjects import is_parking_subject, select_subject
+    return record, violation, address, street, number
 
-    parking = is_parking_subject(select_subject(record))
-    if not parking and not _text(violation.get("description")):
-        raise ValueError("A municipal issue needs an observed description")
+
+def _build_car(
+    record: dict[str, Any],
+    violation: dict[str, Any],
+    address: dict[str, Any],
+    street_line: str,
+    parking: bool,
+) -> dict[str, str]:
+    """Build the car mapping from a validated record; never raises on content."""
     car = {
         "plate": _text(record.get("plate")),
-        "street": f"{street} {number}".strip(),
+        "street": street_line,
         "datetime": _text(record.get("captured_at")),
         "car_type": _text(record.get("car_type")),
         "notes": _text(violation.get("description")),
@@ -88,6 +100,18 @@ def record_to_car(record: object) -> dict[str, str]:
         car["registry_text"] = registry_text
     if address.get("approximate"):
         car["notes"] += ". הכתובת היא קירוב לפי הבניין הממוספר הקרוב לנקודת הצילום"
+    return car
+
+
+def record_to_car(record: object) -> dict[str, str]:
+    """Map one record to the car mapping used by report.py. Raises ValueError if not usable."""
+    data, violation, address, street, number = _validate_record(record)
+    from .subjects import is_parking_subject, select_subject
+
+    parking = is_parking_subject(select_subject(data))
+    if not parking and not _text(violation.get("description")):
+        raise ValueError("A municipal issue needs an observed description")
+    car = _build_car(data, violation, address, f"{street} {number}".strip(), parking)
     for key in ("plate", "datetime") if parking else ("datetime",):
         if not car[key]:
             raise ValueError(f"{key} is missing")
