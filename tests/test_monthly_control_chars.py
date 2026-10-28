@@ -29,7 +29,13 @@ def ledger(text, field):
 class TestControlCharacters(unittest.TestCase):
     def test_each_rejected_character_individually(self):
         for char in REJECTED:
-            for field in ("folder_id", "street", "event_type", "municipal_ref"):
+            for field in (
+                "folder_id",
+                "street",
+                "event_type",
+                "municipal_ref",
+                "ref_mapping",
+            ):
                 with (
                     self.subTest(char=hex(ord(char)), field=field),
                     self.assertRaisesRegex(
