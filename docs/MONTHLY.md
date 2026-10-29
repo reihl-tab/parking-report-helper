@@ -42,6 +42,10 @@ report IDs, duplicate nonempty references and control characters block the whole
 draft with a generic error. No partial stdout or private error values are printed.
 Table text is escaped. Unknown mapping values are not promoted to verified.
 
+Street and event counts use the values with surrounding whitespace removed,
+while the reference table shows each value exactly as recorded in the ledger.
+This difference is kept on purpose and pinned by tests (#133).
+
 ## Verification
 
 Unit tests cover month selection, counts, deterministic ordering, unknown/missing
