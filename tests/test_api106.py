@@ -162,5 +162,79 @@ class ProtocolTests(unittest.TestCase):
             self.assertNotIn("fake-code", out.stdout)
 
 
+@unittest.skipIf(api106 is None, "install the api extra")
+class HebrewFinalLetterTests(unittest.TestCase):
+    """Regression for #137: final-letter spelling variants must alias."""
+
+    def test_normalize_folds_all_five_final_letters(self):
+        for final, regular in zip("ךםןףץ", "כמנפצ"):
+            with self.subTest(pair=(final, regular)):
+                self.assertEqual(
+                    api106.normalize(f"א{final}"), api106.normalize(f"א{regular}")
+                )
+
+    def test_normalize_matches_final_letter_street_variant(self):
+        self.assertEqual(
+            api106.normalize("רחוב משה ברוך"),
+            api106.normalize("רחוב משה ברוכ"),
+        )
+
+    def test_fold_direction_is_final_to_regular(self):
+        self.assertEqual(api106.normalize("אך"), "אכ")
+        self.assertEqual(api106.normalize("אם"), "אמ")
+
+    def test_fold_applies_to_every_occurrence(self):
+        self.assertEqual(api106.normalize("ךכך"), "כככ")
+
+    def test_nfkc_runs_before_folding(self):
+        # U+FB26 HEBREW LETTER WIDE FINAL MEM: NFKC maps it to final mem,
+        # which the fold then maps to regular mem.
+        self.assertEqual(api106.normalize("\ufb26"), "מ")
+
+    def test_qof_and_kaf_stay_distinct(self):
+        self.assertNotEqual(api106.normalize("רייך"), api106.normalize("רייק"))
+
+    def test_nfkc_and_alnum_filter_still_apply(self):
+        self.assertEqual(api106.normalize("ＡＢＣ１２３"), "ABC123")
+        self.assertEqual(api106.normalize("רחוב! הלך?"), "רחובהלכ")
+
+    def _addresses(self, streets, addresses):
+        data = {"version": 1, "streets": streets, "addresses": addresses}
+        tmp = tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False, encoding="utf-8"
+        )
+        with tmp:
+            json.dump(data, tmp, ensure_ascii=False)
+        self.addCleanup(Path(tmp.name).unlink)
+        return api106.Addresses(Path(tmp.name))
+
+    def test_resolve_accepts_final_letter_variant(self):
+        addr = self._addresses(
+            [
+                {
+                    "StreetCode": "99999",
+                    "StreetName": "רחוב משה ברוך",
+                    "CityName": "ירושלים",
+                    "CityCode": "3000",
+                }
+            ],
+            [],
+        )
+        resolved = addr.resolve("רחוב משה ברוכ", "1", (31.77, 35.21))
+        self.assertEqual(resolved["street_code"], "99999")
+        self.assertEqual(resolved["street_name"], "רחוב משה ברוך")
+
+    def test_final_letter_ambiguity_stays_fail_closed(self):
+        addr = self._addresses(
+            [
+                {"StreetCode": "1", "StreetName": "רחוב הלך", "CityName": "ירושלים"},
+                {"StreetCode": "2", "StreetName": "רחוב הלכ", "CityName": "ירושלים"},
+            ],
+            [],
+        )
+        with self.assertRaises(api106.InputError):
+            addr.resolve("רחוב הלך", "1", (31.77, 35.21))
+
+
 if __name__ == "__main__":
     unittest.main()

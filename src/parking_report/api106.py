@@ -51,8 +51,15 @@ def json_file(path: Any) -> Any:
         raise InputError(f"Cannot read valid UTF-8 JSON from {path}.") from exc
 
 
+# Hebrew final letters (ךםןףץ) have no NFKC mapping to their regular forms,
+# so they are folded explicitly (#137). Both the alias index and every lookup
+# pass through normalize(), which keeps matches fail-closed on ambiguity.
+_HEBREW_FINALS = str.maketrans("ךםןףץ", "כמנפצ")
+
+
 def normalize(text: Any) -> Any:
-    return "".join(c for c in unicodedata.normalize("NFKC", text) if c.isalnum())
+    folded = unicodedata.normalize("NFKC", text).translate(_HEBREW_FINALS)
+    return "".join(c for c in folded if c.isalnum())
 
 
 def check_text(value: Any, label: Any) -> Any:
