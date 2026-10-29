@@ -1,0 +1,259 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "parking-report-helper login-only HTTP service",
+    "version": "0.3.0",
+    "summary": "Contract of today's three endpoints in src/parking_report/http_service.py.",
+    "description": "A small, low-volume operator tool, not a general public API (see docs/HTTP106.md and docs/HTTP-SCOPE.md). It describes exactly what the code serves today and adds no endpoint. tests/test_openapi_contract.py checks this file against the Service class offline.\n\nRouting rules outside the documented operations:\n- Every request other than `GET /healthz` without a valid bearer token gets `401` `unauthorized`, whatever its path or method.\n- An authenticated request with any method other than `POST` (except `GET /healthz`) gets `405` `method_not_allowed`.\n- An authenticated `POST` to any other path gets `404` `not_found`.\n\nTokens, credentials and server error text are never returned. Every response is `application/json` with `Cache-Control: no-store`.",
+    "license": {
+      "name": "See LICENSE",
+      "url": "https://github.com/reihlinstinct/parking-report-helper/blob/main/LICENSE"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{origin}",
+      "description": "The operator's private Render origin. It is never published in this repository.",
+      "variables": {
+        "origin": {
+          "default": "example.invalid"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerToken": []
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "health",
+        "summary": "Network-free health check.",
+        "description": "Public and network-free. It never calls Login and never consumes the login gate.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The process is up. Submission is always disabled.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/login-check": {
+      "post": {
+        "operationId": "loginCheck",
+        "summary": "One municipal Login attempt per process.",
+        "description": "Calls only the municipal Login. The request must have an empty body, no query string and no Transfer-Encoding. The in-memory gate is consumed before any network access, including for failed or uncertain attempts, so a second call in the same process returns 409. A restart resets the gate; this is not durable dedupe or an authorization grant.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/LoginOk"
+          },
+          "400": {
+            "description": "A query string, Transfer-Encoding or non-empty body was sent. Login is not called and the gate is not consumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "description": "The single Login attempt for this process was already used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptConsumed"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Login failed. Only a known failure class is returned, never server text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginFailed"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A private municipal credential variable is missing. Login is not called and the gate is not consumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationMissing"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reports": {
+      "post": {
+        "operationId": "reports",
+        "summary": "Hard-disabled report submission.",
+        "description": "Disabled in code, not by an environment switch. It has no municipal effect whatever the request or environment. Enabling it needs a separately reviewed change.",
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "description": "Always: submission is disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionDisabled"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "PARKING_HTTP_TOKEN, at least 32 characters, held only in the private Render environment and the private caller's secrets. Never send it in a query string."
+      }
+    },
+    "headers": {
+      "NoStore": {
+        "schema": {
+          "type": "string",
+          "const": "no-store"
+        }
+      }
+    },
+    "responses": {
+      "LoginOk": {
+        "description": "Login succeeded. The municipal token is not returned.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/LoginOk"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing or wrong bearer token.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Unauthorized"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "required": ["status", "submission_enabled"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "const": "healthy"},
+          "submission_enabled": {"type": "boolean", "const": false}
+        }
+      },
+      "LoginOk": {
+        "type": "object",
+        "required": ["status", "submission_enabled"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "const": "login_ok"},
+          "submission_enabled": {"type": "boolean", "const": false}
+        }
+      },
+      "BadRequest": {
+        "type": "object",
+        "required": ["status"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "enum": ["invalid_request", "body_not_allowed"]}
+        }
+      },
+      "Unauthorized": {
+        "type": "object",
+        "required": ["status"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "const": "unauthorized"}
+        }
+      },
+      "AttemptConsumed": {
+        "type": "object",
+        "required": ["status"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "const": "login_attempt_consumed"}
+        }
+      },
+      "LoginFailed": {
+        "type": "object",
+        "required": ["status", "diagnostic"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "const": "login_failed"},
+          "diagnostic": {"type": "string", "enum": ["login_failed", "http_401", "http_403", "unknown"]}
+        }
+      },
+      "ConfigurationMissing": {
+        "type": "object",
+        "required": ["status"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "const": "configuration_missing"}
+        }
+      },
+      "SubmissionDisabled": {
+        "type": "object",
+        "required": ["status"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "const": "submission_disabled"}
+        }
+      },
+      "MethodNotAllowed": {
+        "description": "Routing fallback described in info.description.",
+        "type": "object",
+        "required": ["status"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "const": "method_not_allowed"}
+        }
+      },
+      "NotFound": {
+        "description": "Routing fallback described in info.description.",
+        "type": "object",
+        "required": ["status"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"type": "string", "const": "not_found"}
+        }
+      }
+    }
+  }
+}

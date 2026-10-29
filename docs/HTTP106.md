@@ -31,6 +31,9 @@ in query parameters or invoke Login from a health probe/startup task.
 
 ## Contract
 
+Machine-readable: [openapi.json](openapi.json), kept equal to the code by
+`tests/test_openapi_contract.py`. Scope decision: [HTTP-SCOPE.md](HTTP-SCOPE.md).
+
 - `GET /healthz`: public, network-free `{status: healthy, submission_enabled: false}`.
 - `POST /v1/login-check`: bearer-authenticated, empty body, no query string. Calls
   only Login. Returns `login_ok` without the token, or a safe failure class.

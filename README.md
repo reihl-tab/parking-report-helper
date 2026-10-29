@@ -252,7 +252,9 @@ it is report-only until the repository variable `RUFF_GATE=on`. See
 `Dockerfile.render` builds a small authenticated Login-check service that was used
 to test hosting options. It is not the filing route: production filing goes through
 GitHub Actions and the VPN tunnel described above. See
-[docs/HTTP106.md](docs/HTTP106.md).
+[docs/HTTP106.md](docs/HTTP106.md), the OpenAPI contract in
+[docs/openapi.json](docs/openapi.json) and the scope decision in
+[docs/HTTP-SCOPE.md](docs/HTTP-SCOPE.md).
 
 ## Other municipal issues and per-report category selection
 
