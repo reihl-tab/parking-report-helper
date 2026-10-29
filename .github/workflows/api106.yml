@@ -28,7 +28,7 @@ permissions:
 jobs:
   preview:
     if: ${{ !inputs.submit }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -64,7 +64,7 @@ jobs:
   live:
     # Intentionally disabled in this PR. Enabling must be a separate reviewed change.
     if: ${{ inputs.submit }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - run: |
           echo 'Live submission is disabled. Review the ledger and enablement design first.'
