@@ -92,6 +92,32 @@ jobs:
           fi
           exit "$status"
 
+  ruff:
+    # Issue #64: ruff lint + format check. Report-only until the repo variable
+    # RUFF_GATE=on (planned for November), the same pattern as MYPY_GATE.
+    name: Ruff (lint + format)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Install ruff (pinned)
+        run: python -m pip install "ruff==0.16.9"
+      - name: ruff check and format check (blocking when repo variable RUFF_GATE=on)
+        env:
+          RUFF_GATE: ${{ vars.RUFF_GATE }}
+        run: |
+          status=0
+          ruff check --output-format=github . || status=1
+          ruff format --check . || status=1
+          if [ "$status" -ne 0 ] && [ "$RUFF_GATE" != "on" ]; then
+            echo "::warning::ruff reported findings; report-only until RUFF_GATE=on (issue #64)"
+            exit 0
+          fi
+          exit "$status"
+
   docker:
     name: Docker image
     runs-on: ubuntu-latest

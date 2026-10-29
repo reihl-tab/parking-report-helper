@@ -2,7 +2,8 @@ import unittest
 from datetime import date
 from typing import ClassVar
 
-from parking_report.registry import VEHICLES, lookup
+from parking_report.registry import VEHICLES, describe_he, lookup
+from parking_report.report import build_report
 
 
 class RegistryTests(unittest.TestCase):
@@ -37,10 +38,6 @@ class RegistryTests(unittest.TestCase):
     def test_invalid_plate(self):
         with self.assertRaises(ValueError):
             lookup("abc", date(2026, 10, 8))
-
-
-from parking_report.registry import describe_he
-from parking_report.report import build_report
 
 
 class DescribeTests(unittest.TestCase):

@@ -10,9 +10,9 @@ import time
 from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .intake import record_to_car
 from .report import build_report
@@ -109,7 +109,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = p.parse_args(argv)
     try:
-
         contact, report, jpeg, digest = prepare(
             args.folder, args.addresses, private_values(os.environ)
         )
@@ -136,7 +135,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             '{"status":"blocked","note":"Check private input and ledger; no automatic retry."}'
         )
         return 4
-
 
 
 DUPLICATE_CHECK_DELAY_SECONDS = 20

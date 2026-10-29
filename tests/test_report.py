@@ -11,14 +11,18 @@ class TestValidation(unittest.TestCase):
     def test_required_fields_are_nonempty_strings(self):
         for field in REQUIRED:
             for value in (None, 123, "", "   "):
-                with self.subTest(field=field, value=value), \
-                        self.assertRaisesRegex(ValueError, field):
+                with (
+                    self.subTest(field=field, value=value),
+                    self.assertRaisesRegex(ValueError, field),
+                ):
                     build_report({**CAR, field: value})
 
     def test_invalid_records(self):
         for value in (None, [], "car", 42):
-            with self.subTest(value=value), \
-                    self.assertRaisesRegex(ValueError, "JSON object"):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(ValueError, "JSON object"),
+            ):
                 build_report(value)
 
     def test_optional_null_fields(self):

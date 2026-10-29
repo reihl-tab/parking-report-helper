@@ -21,7 +21,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from parking_report import api_cli, api106
+from parking_report import api106, api_cli
 
 ENV = {
     "PARKING_REPORTER_FIRST_NAME": "דנה",
@@ -113,17 +113,21 @@ def fake_submit(**overrides):
 
 def run_submit(folder, addresses, check_result):
     out = Out()
-    with patch.object(sys, "stdout", out), patch.dict(
-        "os.environ", ENV, clear=False
-    ), patch("parking_report.ledger.GitLedger", FakeLedger), patch(
-        "parking_report.api106.submit", fake_submit()
-    ), patch("parking_report.api106.Municipality", FakeMunicipalityCtor), patch(
-        "parking_report.api_cli.post_submit_duplicate_check",
-        lambda *_args, **_kwargs: check_result,
-    ) as check:
+    with (
+        patch.object(sys, "stdout", out),
+        patch.dict("os.environ", ENV, clear=False),
+        patch("parking_report.ledger.GitLedger", FakeLedger),
+        patch("parking_report.api106.submit", fake_submit()),
+        patch("parking_report.api106.Municipality", FakeMunicipalityCtor),
+        patch(
+            "parking_report.api_cli.post_submit_duplicate_check",
+            lambda *_args, **_kwargs: check_result,
+        ) as check,
+    ):
         dry = Out()
-        with patch.object(sys, "stdout", dry), patch.dict(
-            "os.environ", ENV, clear=False
+        with (
+            patch.object(sys, "stdout", dry),
+            patch.dict("os.environ", ENV, clear=False),
         ):
             api_cli.main([str(folder), "--addresses", str(addresses)])
         digest = json.loads(dry.getvalue())["sha256"]
@@ -184,15 +188,17 @@ class SubmitDuplicateExitTests(unittest.TestCase):
         out = Out()
         with TemporaryDirectory() as tmp:
             folder, addresses = make_folder(tmp)
-            with patch.object(sys, "stdout", out), patch.dict(
-                "os.environ", ENV, clear=False
-            ), patch("parking_report.ledger.GitLedger", FakeLedger), patch(
-                "parking_report.api106.submit", fake_submit(status="already_submitted")
-            ), patch(
-                "parking_report.api106.Municipality", FakeMunicipalityCtor
-            ), patch(
-                "parking_report.api_cli.post_submit_duplicate_check"
-            ) as check:
+            with (
+                patch.object(sys, "stdout", out),
+                patch.dict("os.environ", ENV, clear=False),
+                patch("parking_report.ledger.GitLedger", FakeLedger),
+                patch(
+                    "parking_report.api106.submit",
+                    fake_submit(status="already_submitted"),
+                ),
+                patch("parking_report.api106.Municipality", FakeMunicipalityCtor),
+                patch("parking_report.api_cli.post_submit_duplicate_check") as check,
+            ):
                 dry = Out()
                 with patch.object(sys, "stdout", dry):
                     api_cli.main([str(folder), "--addresses", str(addresses)])

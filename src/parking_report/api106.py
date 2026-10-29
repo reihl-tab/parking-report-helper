@@ -215,10 +215,7 @@ class Addresses:
             ]
             if gps_xy:
                 (x, y) = gps_xy
-                if (
-                    points
-                    and min(math.hypot(p[0] - x, p[1] - y) for p in points) > 200
-                ):
+                if points and min(math.hypot(p[0] - x, p[1] - y) for p in points) > 200:
                     raise InputError(
                         "The supplied address is more than 200 m from the photo GPS. Check the address."
                     )
@@ -261,10 +258,8 @@ class Addresses:
                 or (len(nearby) > 1 and nearby[1][0] - nearby[0][0] < 8)
             ):
                 choices = "; ".join(
-
-                        f"{(self.streets[c]['StreetName'] if c else name)} {h} ({d:.0f} m)"
-                        for (d, h, c, name) in nearby
-
+                    f"{(self.streets[c]['StreetName'] if c else name)} {h} ({d:.0f} m)"
+                    for (d, h, c, name) in nearby
                 )
                 raise InputError(
                     "GPS does not identify one clear address. Supply --address. Nearby: "

@@ -13,19 +13,16 @@ from parking_report.monthly import REQUIRED, monthly_draft
 
 
 def row(**changes):
-    return (
-        {
-            "folder_id": "example-a",
-            "filed_date": "2026-10-02",
-            "street": "רחוב לדוגמה",
-            "event_type": "sidewalk",
-            "municipal_ref": "2610-000001",
-            "ref_mapping": "unverified_fifo",
-            "plate": "SYNTHETIC-PRIVATE-PLATE",
-            "notes": "PRIVATE-NOTES",
-        }
-        | changes
-    )
+    return {
+        "folder_id": "example-a",
+        "filed_date": "2026-10-02",
+        "street": "רחוב לדוגמה",
+        "event_type": "sidewalk",
+        "municipal_ref": "2610-000001",
+        "ref_mapping": "unverified_fifo",
+        "plate": "SYNTHETIC-PRIVATE-PLATE",
+        "notes": "PRIVATE-NOTES",
+    } | changes
 
 
 class MonthlyTests(unittest.TestCase):

@@ -37,3 +37,17 @@ parking_report = ["configs/*.json"]
 files = ["src"]
 python_version = "3.11"
 warn_unused_configs = true
+
+[tool.ruff]
+# Issue #64. Settings are explicit so a ruff upgrade cannot silently change
+# them; CI pins the ruff version (tests.yml, job "ruff").
+target-version = "py311"
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+# Pyflakes, the error subset of pycodestyle, and import sorting.
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["parking_report"]

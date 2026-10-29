@@ -12,6 +12,23 @@ Diagrams never contain real licence plates, exact addresses, GPS coordinates, or
 
 One issue per change, one PR per issue, full rationale in the commit body. Squash merge to `main`; CI must be green.
 
+## Lint and format (#64)
+
+`ruff` is the linter and formatter. The settings live in `[tool.ruff]` in
+`pyproject.toml`: target Python 3.11, line length 88, and rules `E4`, `E7`,
+`E9`, `F` (pyflakes) and `I` (import order). Before pushing, run:
+
+```sh
+pip install "ruff==0.16.9"
+ruff check .
+ruff format --check .   # or `ruff format .` to apply
+```
+
+CI runs both checks in the `Ruff (lint + format)` job with the same pinned
+version. The job is report-only (a warning) until the repository variable
+`RUFF_GATE=on` makes it blocking, the same pattern as `MYPY_GATE`. Widening the
+rule set is its own PR with the fixes.
+
 ## Language
 
 - Code, identifiers, comments, docs, commit messages and PR text are in **English**.
