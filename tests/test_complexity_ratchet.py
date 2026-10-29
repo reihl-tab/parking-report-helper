@@ -30,7 +30,6 @@ GRANDFATHERED = {
     ("api106.py", "Addresses.resolve"): 31,
     ("api106.py", "Municipality.list_cases"): 29,
     ("cli.py", "main"): 23,
-    ("monthly.py", "monthly_draft"): 33,  # follow-up #133
     ("registry.py", "describe_he"): 22,
     ("status.py", "_validate_row"): 28,  # follow-up #134
 }
