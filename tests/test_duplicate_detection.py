@@ -165,6 +165,14 @@ class SubmitDuplicateExitTests(unittest.TestCase):
         self.assertEqual(payload["duplicate_check"], "single")
         self.assertEqual(payload["duplicate_case_numbers"], [])
 
+    def test_zero_matches_reports_pending_not_single(self):
+        with TemporaryDirectory() as tmp:
+            folder, addresses = make_folder(tmp)
+            code, payload, check = run_submit(folder, addresses, [])
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["duplicate_check"], "pending")
+        self.assertEqual(payload["duplicate_case_numbers"], [])
+
     def test_unavailable_verification_never_fails_the_submission(self):
         with TemporaryDirectory() as tmp:
             folder, addresses = make_folder(tmp)
@@ -222,6 +230,12 @@ class FakeMunicipality:
         return {"incidents": self.incidents}
 
 
+class ExitCodePinTests(unittest.TestCase):
+    def test_duplicate_exit_code_is_the_documented_five(self):
+        # The constant is part of the CLI contract: pin the value, not the name.
+        self.assertEqual(api_cli.DUPLICATE_SUBMIT_EXIT_CODE, 5)
+
+
 class PostSubmitDuplicateCheckTests(unittest.TestCase):
     def test_waits_then_matches_exact_descriptions(self):
         incidents = [
@@ -242,6 +256,38 @@ class PostSubmitDuplicateCheckTests(unittest.TestCase):
         )
         self.assertEqual(delays, [api_cli.DUPLICATE_CHECK_DELAY_SECONDS])
         self.assertEqual(numbers, ["2610-9222952", "2610-9222953"])
+
+    def test_listing_uses_the_reporters_jerusalem_date(self):
+        captured = {}
+
+        class FakeDatetime:
+            @staticmethod
+            def now(tz=None):
+                captured["tz"] = tz
+                from datetime import datetime as real_datetime
+
+                return real_datetime(2026, 10, 29, 0, 30)
+
+        api = FakeMunicipality([])
+        original = api.list_cases
+
+        def spy(token, reporter, *, from_date):
+            captured["from_date"] = from_date
+            return original(token, reporter, from_date=from_date)
+
+        api.list_cases = spy
+        with patch("parking_report.api_cli.datetime", FakeDatetime):
+            api_cli.post_submit_duplicate_check(
+                api,
+                {"ContactIdNumber": "000000018", "ContactIdType": "100000000"},
+                DESCRIPTION,
+                sleep=lambda _seconds: None,
+                today=None,
+            )
+        from zoneinfo import ZoneInfo
+
+        self.assertEqual(captured["tz"], ZoneInfo("Asia/Jerusalem"))
+        self.assertEqual(captured["from_date"], "2026-10-29")
 
     def test_verification_failure_returns_none(self):
         numbers = api_cli.post_submit_duplicate_check(

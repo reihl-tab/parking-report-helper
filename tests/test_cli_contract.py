@@ -322,6 +322,17 @@ class SuccessOutputTest(unittest.TestCase):
         self.assertEqual(err, "")
 
 
+class VersionSyncTest(unittest.TestCase):
+    def test_dunder_version_matches_metadata_and_contract(self) -> None:
+        import parking_report
+
+        self.assertEqual(
+            parking_report.__version__,
+            metadata.version("parking-report-helper"),
+        )
+        self.assertEqual(parking_report.__version__, load_contract()["package_version"])
+
+
 def github_anchor(heading: str) -> str:
     """GitHub-style heading slug: lower-case, punctuation dropped, spaces to -."""
     slug = re.sub(r"[^\w\- ]", "", heading.strip().lower())
