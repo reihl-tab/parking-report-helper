@@ -42,7 +42,10 @@ reports/
   `crosswalk`, `bus_stop`, `disabled_spot`, `corner`, `fire_hydrant`, `double_parking`, `other`.
 - `violation.question`: what to ask the reporter when the violation is unclear.
 - `user_corrections`: the reporter's corrections, kept so the next guesses improve.
-- Required for use: `plate`, `captured_at`, `address.street`. Anything else is optional.
+- Required for use: `plate`, `captured_at`, `address.street`, `address.house_number`. Anything else is optional.
+  A missing house number is skipped with a clarification reason and never invented; see
+  [House numbers](INTAKE.md#house-numbers) in the canonical intake guide for the
+  nearest-building approximation rules.
 - Records that are not ready, or lack a required value, are skipped with a reason on stderr.
   They are never guessed.
 
