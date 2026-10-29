@@ -181,6 +181,19 @@ def in_jerusalem(lat: Any, lon: Any) -> Any:
     return 31.65 <= lat <= 31.95 and 35.05 <= lon <= 35.35
 
 
+def street_names(street: Any) -> Any:
+    """All accepted spellings of one street: official names plus optional aliases."""
+    names = [street.get(key) for key in ("StreetName", "StreetArabicName")]
+    extra = street.get("aliases")
+    if extra is None:
+        extra = []
+    if not isinstance(extra, list) or not all(isinstance(a, str) for a in extra):
+        raise InputError("Street aliases must be a list of strings.")
+    names.extend(extra)
+    # A spelling that normalizes to nothing must not enter the alias index.
+    return [name for name in names if name and normalize(name)]
+
+
 class Addresses:
     def __init__(self, path: Any) -> None:
         data = json_file(path)
@@ -189,9 +202,8 @@ class Addresses:
         self.streets = {str(s["StreetCode"]): s for s in data["streets"]}
         self.aliases: dict[str, set[str]] = {}
         for code, street in self.streets.items():
-            for key in ("StreetName", "StreetArabicName"):
-                if street.get(key):
-                    self.aliases.setdefault(normalize(street[key]), set()).add(code)
+            for name in street_names(street):
+                self.aliases.setdefault(normalize(name), set()).add(code)
         self.points = []
         for lat, lon, house, name in data["addresses"]:
             codes = self.aliases.get(normalize(name), set())
