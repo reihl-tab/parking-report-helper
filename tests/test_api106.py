@@ -350,6 +350,61 @@ class StreetAliasTests(unittest.TestCase):
         self.assertEqual(len(addr.points), 1)
         self.assertIsNone(addr.points[0][3])
 
+    def test_arabic_name_resolves_to_its_street(self):
+        # #144: street_names() feeds StreetArabicName into the alias index.
+        addr = self._addresses(
+            [
+                {
+                    "StreetCode": "7",
+                    "StreetName": "רחוב הניסוי",
+                    "StreetArabicName": "شارع التجربة",
+                    "CityName": "ירושלים",
+                },
+                {"StreetCode": "8", "StreetName": "רחוב אחר", "CityName": "ירושלים"},
+            ]
+        )
+        resolved = addr.resolve("شارع التجربة", "1", (31.77, 35.21))
+        self.assertEqual(resolved["street_code"], "7")
+        # The report always carries the official Hebrew name.
+        self.assertEqual(resolved["street_name"], "רחוב הניסוי")
+
+    def test_arabic_name_collision_stays_fail_closed(self):
+        # #144: an Arabic spelling shared with another street matches no
+        # single StreetCode, so resolve() must reject it.
+        cases = {
+            "other_arabic_name": {
+                "StreetCode": "8",
+                "StreetName": "רחוב אחר",
+                "StreetArabicName": "شارع التجربة",
+                "CityName": "ירושלים",
+            },
+            "other_alias": {
+                "StreetCode": "8",
+                "StreetName": "רחוב אחר",
+                "CityName": "ירושלים",
+                "aliases": ["شارع التجربة"],
+            },
+        }
+        for label, other in cases.items():
+            with self.subTest(collides_with=label):
+                addr = self._addresses(
+                    [
+                        {
+                            "StreetCode": "7",
+                            "StreetName": "רחוב הניסוי",
+                            "StreetArabicName": "شارع التجربة",
+                            "CityName": "ירושלים",
+                        },
+                        other,
+                    ]
+                )
+                with self.assertRaises(api106.InputError):
+                    addr.resolve("شارع التجربة", "1", (31.77, 35.21))
+                # Each street's own Hebrew name still resolves.
+                self.assertEqual(
+                    addr.resolve("רחוב אחר", "1", (31.77, 35.21))["street_code"], "8"
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
