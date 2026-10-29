@@ -6,8 +6,11 @@ import argparse
 import hashlib
 import json
 import os
+import time
 from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
 
@@ -135,6 +138,42 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 4
 
 
+
+DUPLICATE_CHECK_DELAY_SECONDS = 20
+DUPLICATE_SUBMIT_EXIT_CODE = 5
+
+
+def post_submit_duplicate_check(
+    api: Any,
+    reporter: Any,
+    description: str,
+    *,
+    sleep: Any = time.sleep,
+    today: Any = None,
+) -> Any:
+    """Detect a server-side duplicate of a case we just submitted (#160).
+
+    The municipality has created a second CRM case from one CreateCase POST,
+    seconds later. Wait briefly, then count today's cases carrying our exact
+    submitted text. Returns the sorted matching case numbers, or None when the
+    verification itself failed: that must never fail a finished submission.
+    """
+    from .api106 import duplicate_case_numbers
+
+    sleep(DUPLICATE_CHECK_DELAY_SECONDS)
+    if today is None:
+        # The municipal day boundary is the reporter's, not the server's.
+        today = datetime.now(ZoneInfo("Asia/Jerusalem")).date().isoformat()
+    try:
+        token = api.login()
+        incidents = api.list_cases(token, reporter, from_date=today).get(
+            "incidents", []
+        )
+    except Exception:  # noqa: BLE001 - verification is best-effort by design
+        return None
+    return duplicate_case_numbers(incidents, description)
+
+
 def execute(
     args: Any,
     contact: dict[str, Any],
@@ -204,16 +243,34 @@ def execute(
         initial_state=entry["state"],
     )
     # Case receipts remain in the private state ledger, not action logs.
-    print(
-        json.dumps(
-            {
-                "status": result["status"],
-                "sha256": digest,
-                "photo_attached": result["photo_attached"],
-            }
+    output = {
+        "status": result["status"],
+        "sha256": digest,
+        "photo_attached": result["photo_attached"],
+    }
+    exit_code = 0
+    output["duplicate_check"] = "skipped"
+    output["duplicate_case_numbers"] = []
+    description = report.get("CaseDescription")
+    if result["status"] == "submitted" and isinstance(description, str) and description:
+        numbers = post_submit_duplicate_check(
+            Municipality(credentials), contact, description
         )
-    )
-    return 0
+        if numbers is None:
+            output["duplicate_check"] = "unavailable"
+        elif len(numbers) > 1:
+            # Numbers only: descriptions, plates and addresses stay out of logs.
+            output["duplicate_check"] = "duplicates_found"
+            output["duplicate_case_numbers"] = numbers
+            exit_code = DUPLICATE_SUBMIT_EXIT_CODE
+        elif numbers:
+            output["duplicate_check"] = "single"
+        else:
+            # The CRM listing can lag creation by minutes; the next scheduled
+            # sync remains the net that catches a late duplicate.
+            output["duplicate_check"] = "pending"
+    print(json.dumps(output, ensure_ascii=False))
+    return exit_code
 
 
 if __name__ == "__main__":

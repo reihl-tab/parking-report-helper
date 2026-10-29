@@ -4,7 +4,7 @@ Issue #73. This file **documents what the three entry points do today**. It
 doesn't change them. `tests/test_cli_contract.py` loads the JSON block below
 and checks it against the real parsers and exit paths. Changing a flag, a
 default or an exit code without updating this file fails CI. The package
-version is `0.2.0`. Changes to this contract follow the
+version is `0.3.0`. Changes to this contract follow the
 [flag-stability policy](#flag-stability-policy).
 
 ## Machine-readable contract
@@ -13,7 +13,7 @@ version is `0.2.0`. Changes to this contract follow the
 ```json
 {
   "contract_version": 0,
-  "package_version": "0.2.0",
+  "package_version": "0.3.0",
   "commands": {
     "parking-report": {
       "module": "parking_report.cli:main",
@@ -44,11 +44,11 @@ version is `0.2.0`. Changes to this contract follow the
         "--retry-photo": {"default": false, "flag": true},
         "--approved-category-routing": {"default": "", "choices": ["crosswalk_parking", "blocked_ramp"], "deprecated": true}
       },
-      "exit_codes": {"0": "one JSON line: dry_run or submit result; --help prints argparse help text instead", "2": "usage error: argparse usage text on stderr, no JSON", "4": "blocked: fixed JSON line, no exception text"},
+      "exit_codes": {"0": "one JSON line: dry_run or submit result; --help prints argparse help text instead", "2": "usage error: argparse usage text on stderr, no JSON", "4": "blocked: fixed JSON line, no exception text", "5": "submit succeeded but the duplicate check found a second municipal case with the same text; case numbers in duplicate_case_numbers"},
       "json_output": "one line on stdout for every outcome after successful argument parsing",
       "stdout_keys": {
         "dry_run": ["status", "sha256", "photo_upload_bytes", "network_requests"],
-        "submit": ["status", "sha256", "photo_attached"],
+        "submit": ["status", "sha256", "photo_attached", "duplicate_check", "duplicate_case_numbers"],
         "blocked": ["status", "note"]
       }
     },
@@ -70,7 +70,7 @@ version is `0.2.0`. Changes to this contract follow the
 ## Notes on current behaviour
 
 - **`parking-report`** needs exactly one of `input` or `--intake DIR`. `--drive-folder` requires `--intake`, `--drive-api` requires `--drive-folder` (it's for a local test server only and is hidden from `--help`), and `--reporter` and `--json` require `--municipality`. A broken rule exits 2 with an argparse usage message.
-- **`parking-report-106`** prints exactly one JSON line for every outcome *after argument parsing succeeds*: `dry_run` or `submit` (exit 0), or the fixed `blocked` line (exit 4). Every `Exception` after parsing becomes that `blocked` line (a `BaseException` such as `KeyboardInterrupt` or `SystemExit` still propagates), and no exception text reaches the log. Before that point argparse owns the output: `--help` prints help text and exits 0, and a usage error prints usage text to stderr and exits 2. Neither is JSON. A live submission additionally needs `PARKING_106_ENABLE_LIVE=true`, the exact `--approved-sha256` and `--ledger-dir`; otherwise it ends `blocked`.
+- **`parking-report-106`** prints exactly one JSON line for every outcome *after argument parsing succeeds*: `dry_run` or `submit` (exit 0), the fixed `blocked` line (exit 4), or a successful submit whose post-submit duplicate check found a second municipal case with the identical text (exit 5, with `duplicate_check: "duplicates_found"` and the case numbers in `duplicate_case_numbers`; every submit line carries `duplicate_check` and `duplicate_case_numbers`: a fresh submission prints `"single"`, `"pending"` (the new case is not visible in the municipal listing yet), or `"unavailable"` when the check itself failed, none of which change the exit code, and any other submit result prints `"skipped"` with an empty list). Every `Exception` after parsing becomes that `blocked` line (a `BaseException` such as `KeyboardInterrupt` or `SystemExit` still propagates), and no exception text reaches the log. Before that point argparse owns the output: `--help` prints help text and exits 0, and a usage error prints usage text to stderr and exits 2. Neither is JSON. A live submission additionally needs `PARKING_106_ENABLE_LIVE=true`, the exact `--approved-sha256` and `--ledger-dir`; otherwise it ends `blocked`.
 - **`parking-report-http`** doesn't read command-line arguments: `main()` takes none and never looks at `sys.argv`, so extra arguments are **ignored, not rejected**. Rejecting them would be a behaviour change for a separate PR. A missing or short `PARKING_HTTP_TOKEN` or an invalid `PORT` exits 1 with the fixed message in `config_error_message`. Otherwise it serves until it's stopped.
 
 ## Known gaps (measured, not fixed here)

@@ -517,6 +517,27 @@ class Municipality:
         )
 
 
+def duplicate_case_numbers(incidents: Any, description: str) -> Any:
+    """Case numbers whose description matches the submitted text exactly (#160).
+
+    The municipality has created two CRM cases from a single CreateCase POST,
+    seconds apart. Detection compares the exact submitted text only; case
+    numbers are safe to log, descriptions are not.
+    """
+    if not isinstance(description, str) or not description:
+        raise InputError("Supply the exact submitted description.")
+    numbers = []
+    for incident in incidents if isinstance(incidents, list) else []:
+        if not isinstance(incident, dict):
+            continue
+        if incident.get("description") != description:
+            continue
+        number = incident.get("case_number")
+        if isinstance(number, str) and number:
+            numbers.append(number)
+    return sorted(numbers)
+
+
 def save_state(path: Any, state: Any) -> Any:
     (fd, temporary) = tempfile.mkstemp(prefix=".progress-", dir=path.parent)
     try:

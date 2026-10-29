@@ -182,7 +182,7 @@ class ExitCodeTest(unittest.TestCase):
 
     def test_parking_report_106_exit_codes_and_fixed_blocked_line(self) -> None:
         spec = self.contract["parking-report-106"]
-        self.assertEqual(set(spec["exit_codes"]), {"0", "2", "4"})
+        self.assertEqual(set(spec["exit_codes"]), {"0", "2", "4", "5"})
         self.assertEqual(run(api_cli.main, [])[0], 2)
         with TemporaryDirectory() as tmp, patch.dict("os.environ", {}, clear=True):
             code, out, err = run(
