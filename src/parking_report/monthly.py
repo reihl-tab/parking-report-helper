@@ -86,6 +86,50 @@ def _validate_selected_row(
     return ref
 
 
+def _summary_lines(month: str, selected: list[dict[str, str]]) -> list[str]:
+    """Title, draft notice and the three totals, ending with a blank line."""
+    verified = sum(row["ref_mapping"] == "verified" for row in selected)
+    return [
+        f"# טיוטה: סיכום דיווחים לחודש {month}",
+        "",
+        "טיוטה לבדיקה בלבד. הנמענים והנוסח דורשים אישור לפני שליחה.",
+        "",
+        f"רשומות דיווח ביומן: {len(selected)}",
+        f"שיוך מספר פנייה מאומת: {verified}",
+        f"שיוך חסר או לא מאומת: {len(selected) - verified}",
+        "",
+        "הספירה היא של אירועי דיווח ביומן, לא של כלי רכב ייחודיים או תוצאות אכיפה.",
+        "רחובות וסוגי אירוע נשענים על היומן; שיוך פנייה לא מאומת אינו מאשר את פרטי הפנייה בעירייה.",
+        "",
+    ]
+
+
+def _count_table(title: str, column: str, counts: Counter[str]) -> list[str]:
+    """A count section, most reports first, ties by key."""
+    lines = [f"## {title}", "", f"| {column} | דיווחים |", "| --- | ---: |"]
+    lines += [
+        f"| {_cell(key)} | {count} |"
+        for key, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+    return lines
+
+
+def _reference_table(selected: list[dict[str, str]]) -> list[str]:
+    """The per-row reference table, using the raw ledger values."""
+    lines = [
+        "## מספרי פנייה",
+        "",
+        "| תאריך | רחוב | סוג אירוע | מספר פנייה | שיוך |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for row in selected:
+        status = "מאומת" if row["ref_mapping"] == "verified" else "לא מאומת"
+        ref = row["municipal_ref"] or "חסר"
+        cells = (row["filed_date"], row["street"], row["event_type"], ref, status)
+        lines.append("| " + " | ".join(_cell(value) for value in cells) + " |")
+    return lines
+
+
 def monthly_draft(rows: Iterable[Mapping[str, str]], month: str) -> str:
     """Validate before rendering. Count ledger events, not unique plates or confirmed cases."""
     _check_month(month)
@@ -98,59 +142,16 @@ def monthly_draft(rows: Iterable[Mapping[str, str]], month: str) -> str:
         ref = _validate_selected_row(row, seen, references)
         selected.append(dict(row, municipal_ref=ref))
     selected.sort(key=lambda row: (row["filed_date"], row["folder_id"]))
+    # Quirk kept on purpose (#133): counts use the stripped street and event
+    # type, while the reference table shows the raw ledger values.
     streets = Counter(row["street"].strip() for row in selected)
     events = Counter(row["event_type"].strip() for row in selected)
-    verified = sum(row["ref_mapping"] == "verified" for row in selected)
-    lines = [
-        f"# טיוטה: סיכום דיווחים לחודש {month}",
-        "",
-        "טיוטה לבדיקה בלבד. הנמענים והנוסח דורשים אישור לפני שליחה.",
-        "",
-        f"רשומות דיווח ביומן: {len(selected)}",
-        f"שיוך מספר פנייה מאומת: {verified}",
-        f"שיוך חסר או לא מאומת: {len(selected) - verified}",
-        "",
-        "הספירה היא של אירועי דיווח ביומן, לא של כלי רכב ייחודיים או תוצאות אכיפה.",
-        "רחובות וסוגי אירוע נשענים על היומן; שיוך פנייה לא מאומת אינו מאשר את פרטי הפנייה בעירייה.",
-        "",
-        "## לפי רחוב",
-        "",
-        "| רחוב | דיווחים |",
-        "| --- | ---: |",
-    ]
-    lines += [
-        f"| {_cell(key)} | {count} |"
-        for key, count in sorted(streets.items(), key=lambda item: (-item[1], item[0]))
-    ]
-    lines += ["", "## לפי סוג אירוע", "", "| סוג אירוע | דיווחים |", "| --- | ---: |"]
-    lines += [
-        f"| {_cell(key)} | {count} |"
-        for key, count in sorted(events.items(), key=lambda item: (-item[1], item[0]))
-    ]
-    lines += [
-        "",
-        "## מספרי פנייה",
-        "",
-        "| תאריך | רחוב | סוג אירוע | מספר פנייה | שיוך |",
-        "| --- | --- | --- | --- | --- |",
-    ]
-    for row in selected:
-        status = "מאומת" if row["ref_mapping"] == "verified" else "לא מאומת"
-        ref = row["municipal_ref"] or "חסר"
-        lines.append(
-            "| "
-            + " | ".join(
-                _cell(value)
-                for value in (
-                    row["filed_date"],
-                    row["street"],
-                    row["event_type"],
-                    ref,
-                    status,
-                )
-            )
-            + " |"
-        )
+    lines = _summary_lines(month, selected)
+    lines += _count_table("לפי רחוב", "רחוב", streets)
+    lines += [""]
+    lines += _count_table("לפי סוג אירוע", "סוג אירוע", events)
+    lines += [""]
+    lines += _reference_table(selected)
     if not selected:
         lines += ["", "אין רשומות בחודש הנבחר ביומן שסופק."]
     return "\n".join(lines) + "\n"
