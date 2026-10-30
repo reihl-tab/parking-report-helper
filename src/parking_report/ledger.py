@@ -98,34 +98,82 @@ class GitLedger:
         # Recheck remote acceptance even if a push result appeared successful.
         self.assert_current()
 
-    def reserve(self, report_id: str, digest: str, photo_hash: str) -> dict[str, Any]:
+    def reserve(
+        self,
+        report_id: str,
+        digest: str,
+        photo_hash: str,
+        *,
+        followup: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,119}", report_id):
             raise LedgerError("Stable intake ID must be an opaque folder name")
         if any(
             not re.fullmatch(r"[0-9a-f]{64}", value) for value in (digest, photo_hash)
         ):
             raise LedgerError("Invalid payload/photo digest")
+        if followup is not None:
+            from .followup import validate_followup
+
+            followup = validate_followup(followup)
         reports = self.data["reports"]
         key = hashlib.sha256(report_id.encode()).hexdigest()
         existing = reports.get(key)
         if existing:
-            if existing["digest"] != digest or existing["photo_sha256"] != photo_hash:
+            if (
+                existing["digest"] != digest
+                or existing["photo_sha256"] != photo_hash
+                or existing.get("followup") != followup
+            ):
                 raise LedgerError(
                     "Existing intake ID has changed inputs; review without creating a new case"
                 )
             return existing
         other = self.data["photos"].get(photo_hash)
-        if other and other != key:
+        if followup is not None:
+            self._check_parent(key, photo_hash, followup)
+        elif other and other != key:
             raise LedgerError("Original photo already belongs to another intake ID")
         entry = {
             "digest": digest,
             "photo_sha256": photo_hash,
             "state": {"version": 1, "status": "prepared"},
         }
+        if followup is not None:
+            entry["followup"] = followup
         reports[key] = entry
-        self.data["photos"][photo_hash] = key
+        if followup is None:
+            self.data["photos"][photo_hash] = key
         self.persist()
         return entry
+
+    def _check_parent(
+        self, key: str, photo_hash: str, followup: dict[str, str]
+    ) -> None:
+        reports = self.data["reports"]
+        parent_key = hashlib.sha256(followup["parent_id"].encode()).hexdigest()
+        parent = reports.get(parent_key)
+        if parent_key == key or not parent:
+            raise LedgerError("Follow-up parent is missing or self-referential")
+        expected = (followup["parent_digest"], photo_hash, "complete")
+        actual = (
+            parent.get("digest"),
+            parent.get("photo_sha256"),
+            parent.get("state", {}).get("status"),
+        )
+        if actual != expected:
+            raise LedgerError("Follow-up needs the completed matching parent")
+        receipt_number = parent.get("state", {}).get("case", {}).get("CaseNumberInCRM")
+        if receipt_number and receipt_number != followup["parent_case_number"]:
+            raise LedgerError("Follow-up case reference conflicts with parent receipt")
+        origin = self.data["photos"].get(photo_hash)
+        if not origin or origin not in reports:
+            raise LedgerError("Follow-up photo index is missing")
+        if any(
+            e.get("followup", {}).get("parent_id") == followup["parent_id"]
+            for e in reports.values()
+        ):
+            raise LedgerError("Parent already has a follow-up; reconcile it first")
 
     def checkpoint(self, report_id: str, state: dict[str, Any]) -> None:
         key = hashlib.sha256(report_id.encode()).hexdigest()

@@ -83,6 +83,10 @@ For the full diagram and responsibilities of both repositories, see
 `docs/ARCHITECTURE.md` in the private `parking-reports` repository (collaborators
 only).
 
+Explicitly approved follow-ups can reuse original evidence only through the
+[parent-linked follow-up gate](docs/AUTHORIZED-FOLLOWUPS.md), never by changing
+photo bytes or deleting duplicate history.
+
 ## Safety rules
 
 - Never auto-submits, never touches a CAPTCHA, never retries a municipal write.
