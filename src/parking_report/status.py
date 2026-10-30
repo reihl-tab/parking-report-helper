@@ -46,14 +46,8 @@ def _safe(value: str) -> str:
 Report = tuple[dict[str, str], str, int, bool, bool]
 
 
-def _validate_row(
-    raw: Mapping[str, str], today: date, ids: set[str], refs: set[str]
-) -> tuple[dict[str, str], date, date | None, date | None]:
-    """Validate one ledger row; record its ID and reference in ``ids``/``refs``.
-
-    Returns the normalised row (stripped municipal_ref) with its filing,
-    response-check and last-reminder dates. Raises ValueError on bad input.
-    """
+def _clean_row(raw: Mapping[str, str]) -> dict[str, str]:
+    """Project the known columns and reject missing or unsafe values."""
     if not REQUIRED.issubset(raw):
         raise ValueError("Missing ledger columns")
     row = {key: raw.get(key, "") for key in TEXT_FIELDS}
@@ -67,9 +61,11 @@ def _validate_row(
             raise ValueError("Unsafe ledger value")
     if not all(row[key].strip() for key in ("folder_id", "street", "event_type")):
         raise ValueError("Missing report identity")
-    filed = _day(row["filed_date"])
-    if filed > today:
-        raise ValueError("Future filing date")
+    return row
+
+
+def _unique_ref(row: dict[str, str], ids: set[str], refs: set[str]) -> None:
+    """Record the report ID and municipal reference; reject duplicates."""
     if row["folder_id"] in ids:
         raise ValueError("Duplicate report ID")
     ids.add(row["folder_id"])
@@ -79,6 +75,10 @@ def _validate_row(
     if ref:
         refs.add(ref)
     row["municipal_ref"] = ref
+
+
+def _response_checked(row: Mapping[str, str], filed: date, today: date) -> date | None:
+    """Validate the response state and return its check date, if any."""
     response = row["municipal_response"] or "unknown"
     if response not in {"unknown", "no_reply", "received"}:
         raise ValueError("Unknown response status")
@@ -87,9 +87,32 @@ def _validate_row(
         raise ValueError("Invalid response check date")
     if response != "unknown" and (not checked or not row["response_evidence"].strip()):
         raise ValueError("Response state requires checked date and source evidence")
+    return checked
+
+
+def _reminder_date(row: Mapping[str, str], filed: date, today: date) -> date | None:
+    """Return the last-reminder date, if present and in range."""
     reminded = _day(row["last_reminder_at"]) if row["last_reminder_at"] else None
     if reminded and not filed <= reminded <= today:
         raise ValueError("Invalid reminder date")
+    return reminded
+
+
+def _validate_row(
+    raw: Mapping[str, str], today: date, ids: set[str], refs: set[str]
+) -> tuple[dict[str, str], date, date | None, date | None]:
+    """Validate one ledger row; record its ID and reference in ``ids``/``refs``.
+
+    Returns the normalised row (stripped municipal_ref) with its filing,
+    response-check and last-reminder dates. Raises ValueError on bad input.
+    """
+    row = _clean_row(raw)
+    filed = _day(row["filed_date"])
+    if filed > today:
+        raise ValueError("Future filing date")
+    _unique_ref(row, ids, refs)
+    checked = _response_checked(row, filed, today)
+    reminded = _reminder_date(row, filed, today)
     return row, filed, checked, reminded
 
 
