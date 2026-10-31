@@ -82,7 +82,7 @@ class TestStateAfterReferenceError(unittest.TestCase):
 
 
 class TestDelCharacter(unittest.TestCase):
-    def test_del_is_rejected_in_every_text_field(self):
+    def test_del_is_rejected_in_sample_text_fields(self):
         for field in (
             "plate",
             "street",
