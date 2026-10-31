@@ -108,6 +108,65 @@ def _he_date(value: Any) -> str:
     return f"{d.day}.{d.month}.{d.year}"
 
 
+def _vehicle_sentences(result: dict[str, Any]) -> list[str]:
+    """Vehicle sentences for a matched vehicle lookup; [] otherwise."""
+    if result.get("vehicle_lookup") != "matched":
+        # No match or failed lookup: say nothing about licence/test (unknown is
+        # not a finding).
+        return []
+    vehicle_raw = result.get("vehicle")
+    vehicle: dict[str, Any] = vehicle_raw if isinstance(vehicle_raw, dict) else {}
+    parts: list[str] = []
+    name = " ".join(
+        str(vehicle[k]).strip() for k in ("tozeret_nm", "degem_nm") if vehicle.get(k)
+    )
+    if vehicle.get("kinuy_mishari"):
+        name += f" ({str(vehicle['kinuy_mishari']).strip()})"
+    if name:
+        parts.append(
+            f"רכב מסוג {name}"
+            + (
+                f", צבע {str(vehicle['tzeva_rechev']).strip()}."
+                if vehicle.get("tzeva_rechev")
+                else "."
+            )
+        )
+    parts.append(_licence_sentence(vehicle, result.get("licence_status")))
+    test = _he_date(vehicle.get("mivchan_acharon_dt"))
+    if test:
+        parts.append(f"מבחן רישוי אחרון: {test}.")
+    return parts
+
+
+def _licence_sentence(vehicle: dict[str, Any], status: Any) -> str:
+    """Licence validity sentence; 'not verified' unless date and status agree."""
+    expiry = _he_date(vehicle.get("tokef_dt"))
+    if expiry and status == "valid_on_check_date":
+        return f"תוקף רישיון הרכב עד {expiry} (בתוקף)."
+    if expiry and status == "expired_on_check_date":
+        return f"תוקף רישיון הרכב פג ב-{expiry}; אין לרכב רישיון בתוקף."
+    return "תוקף הרישיון לא אומת."
+
+
+def _disability_sentence(result: dict[str, Any]) -> str | None:
+    """Disability-tag sentence; None for a failed or unknown lookup (omitted)."""
+    disability_lookup = result.get("disability_lookup")
+    if disability_lookup == "not_found_in_dataset":
+        return "לא נמצא לרכב תג נכה במאגר תגי הנכים."
+    if disability_lookup != "matched":
+        return None
+    tag_raw = result.get("disability")
+    tag: dict[str, Any] = tag_raw if isinstance(tag_raw, dict) else {}
+    text = "לרכב רשום תג נכה במאגר תגי הנכים"
+    kind = tag.get("SUG TAV")
+    if kind not in (None, ""):
+        text += f" (קוד סוג תג: {str(kind).strip()})"
+    issued = _he_date(tag.get("TAARICH HAFAKAT TAG"))
+    if issued:
+        text += f", הונפק ב-{issued}"
+    return text + "."
+
+
 def describe_he(result: Any) -> str:
     """Hebrew sentences for a municipal report from a lookup() result.
 
@@ -120,53 +179,10 @@ def describe_he(result: Any) -> str:
     parts = [
         "בדיקה במאגרי משרד התחבורה" + (f" (נכון ל-{checked})" if checked else "") + ":"
     ]
-    vehicle_lookup = result.get("vehicle_lookup")
-    vehicle_raw = result.get("vehicle")
-    vehicle: dict[str, Any] = vehicle_raw if isinstance(vehicle_raw, dict) else {}
-    if vehicle_lookup == "matched":
-        name = " ".join(
-            str(vehicle[k]).strip()
-            for k in ("tozeret_nm", "degem_nm")
-            if vehicle.get(k)
-        )
-        if vehicle.get("kinuy_mishari"):
-            name += f" ({str(vehicle['kinuy_mishari']).strip()})"
-        if name:
-            parts.append(
-                f"רכב מסוג {name}"
-                + (
-                    f", צבע {str(vehicle['tzeva_rechev']).strip()}."
-                    if vehicle.get("tzeva_rechev")
-                    else "."
-                )
-            )
-        expiry = _he_date(vehicle.get("tokef_dt"))
-        status = result.get("licence_status")
-        if expiry and status == "valid_on_check_date":
-            parts.append(f"תוקף רישיון הרכב עד {expiry} (בתוקף).")
-        elif expiry and status == "expired_on_check_date":
-            parts.append(f"תוקף רישיון הרכב פג ב-{expiry}; אין לרכב רישיון בתוקף.")
-        else:
-            parts.append("תוקף הרישיון לא אומת.")
-        test = _he_date(vehicle.get("mivchan_acharon_dt"))
-        if test:
-            parts.append(f"מבחן רישוי אחרון: {test}.")
-    # No match or failed lookup: say nothing about licence/test (unknown is not a finding).
-    disability_lookup = result.get("disability_lookup")
-    if disability_lookup == "matched":
-        tag_raw = result.get("disability")
-        tag: dict[str, Any] = tag_raw if isinstance(tag_raw, dict) else {}
-        text = "לרכב רשום תג נכה במאגר תגי הנכים"
-        kind = tag.get("SUG TAV")
-        if kind not in (None, ""):
-            text += f" (קוד סוג תג: {str(kind).strip()})"
-        issued = _he_date(tag.get("TAARICH HAFAKAT TAG"))
-        if issued:
-            text += f", הונפק ב-{issued}"
-        parts.append(text + ".")
-    elif disability_lookup == "not_found_in_dataset":
-        parts.append("לא נמצא לרכב תג נכה במאגר תגי הנכים.")
-    # Failed disability lookup: omitted as well.
+    parts += _vehicle_sentences(result)
+    disability = _disability_sentence(result)
+    if disability is not None:
+        parts.append(disability)
     return " ".join(parts) if len(parts) > 1 else ""
 
 
