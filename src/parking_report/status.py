@@ -67,7 +67,8 @@ def _clean_row(raw: Mapping[str, str]) -> dict[str, str]:
 def _unique_id_and_ref(row: dict[str, str], ids: set[str], refs: set[str]) -> None:
     """Record the report ID, then check and record the municipal reference.
 
-    Rejects a duplicate ID before the reference is validated.
+    Rejects a duplicate ID before the reference is validated. Writes the
+    stripped municipal_ref back into ``row`` (the row is mutated in place).
     """
     if row["folder_id"] in ids:
         raise ValueError("Duplicate report ID")
