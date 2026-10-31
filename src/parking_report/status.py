@@ -64,8 +64,11 @@ def _clean_row(raw: Mapping[str, str]) -> dict[str, str]:
     return row
 
 
-def _unique_ref(row: dict[str, str], ids: set[str], refs: set[str]) -> None:
-    """Record the report ID and municipal reference; reject duplicates."""
+def _unique_id_and_ref(row: dict[str, str], ids: set[str], refs: set[str]) -> None:
+    """Record the report ID, then check and record the municipal reference.
+
+    Rejects a duplicate ID before the reference is validated.
+    """
     if row["folder_id"] in ids:
         raise ValueError("Duplicate report ID")
     ids.add(row["folder_id"])
@@ -110,7 +113,7 @@ def _validate_row(
     filed = _day(row["filed_date"])
     if filed > today:
         raise ValueError("Future filing date")
-    _unique_ref(row, ids, refs)
+    _unique_id_and_ref(row, ids, refs)
     checked = _response_checked(row, filed, today)
     reminded = _reminder_date(row, filed, today)
     return row, filed, checked, reminded
