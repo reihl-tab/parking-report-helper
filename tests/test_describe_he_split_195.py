@@ -68,6 +68,25 @@ class TestExactOutput(unittest.TestCase):
             + " לרכב רשום תג נכה במאגר תגי הנכים (קוד סוג תג: 0), הונפק ב-1.1.2025.",
         )
 
+    def test_padded_colour_and_tag_kind_are_stripped(self):
+        padded = result(
+            vehicle=result()["vehicle"] | {"tzeva_rechev": "  לבן  "},
+            disability={"SUG TAV": "  3  ", "TAARICH HAFAKAT TAG": "20250101"},
+        )
+        text = describe_he(padded)
+        self.assertIn(", צבע לבן.", text)
+        self.assertIn("(קוד סוג תג: 3)", text)
+        self.assertNotIn(" .", text)
+        self.assertNotIn(" )", text)
+        self.assertEqual(
+            text,
+            HEAD
+            + " רכב מסוג טויוטה קורולה (היבריד), צבע לבן."
+            + " תוקף רישיון הרכב עד 5.1.2027 (בתוקף)."
+            + " מבחן רישוי אחרון: 4.1.2026."
+            + " לרכב רשום תג נכה במאגר תגי הנכים (קוד סוג תג: 3), הונפק ב-1.1.2025.",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
