@@ -30,7 +30,6 @@ GRANDFATHERED = {
     ("api106.py", "Addresses.resolve"): 31,
     ("api106.py", "Municipality.list_cases"): 29,
     ("cli.py", "main"): 23,
-    ("registry.py", "describe_he"): 22,
 }
 
 _FUNC = (ast.FunctionDef, ast.AsyncFunctionDef)
