@@ -383,6 +383,105 @@ class RefreshCommandTest(unittest.TestCase):
         self.assertEqual(code, 2)
         fetch.assert_not_called()
 
+    def test_refresh_non_padded_from_date_exits_2_before_fetch(self):
+        # strptime is lenient about "2026-1-5"; the municipal API is not.
+        # Reject it locally, before login (#237).
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            mock.patch.dict("os.environ", self.ENV, clear=False),
+            mock.patch(
+                "parking_report.stats_cli._fetch_incidents",
+                side_effect=AssertionError("fetch must not run on a bad date"),
+            ) as fetch,
+        ):
+            code = run(["refresh", "-o", str(Path(tmp) / "out"), "--from", "2026-1-5"])
+        self.assertEqual(code, 2)
+        fetch.assert_not_called()
+
+    def test_refresh_missing_plates_ledger_fails_before_fetch_and_union(self):
+        # A bad --plates-ledger is a local-input error: fail before the
+        # network fetch and before any --save-union write (#237).
+        with tempfile.TemporaryDirectory() as tmp:
+            union_path = Path(tmp) / "union.json"
+            with (
+                mock.patch.dict("os.environ", self.ENV, clear=False),
+                mock.patch(
+                    "parking_report.stats_cli._fetch_incidents",
+                    side_effect=AssertionError("fetch must not run"),
+                ) as fetch,
+            ):
+                code = run(
+                    [
+                        "refresh",
+                        "-o",
+                        str(Path(tmp) / "out"),
+                        "--plates-ledger",
+                        str(Path(tmp) / "no-such-ledger.csv"),
+                        "--save-union",
+                        str(union_path),
+                    ]
+                )
+            self.assertEqual(code, 1)
+            fetch.assert_not_called()
+            self.assertFalse(union_path.exists())
+
+    def test_refresh_save_union_written_0600(self):
+        # The union file holds private case texts (#237).
+        import os
+        import stat
+
+        with tempfile.TemporaryDirectory() as tmp:
+            union_path = Path(tmp) / "union.json"
+            with (
+                mock.patch.dict("os.environ", self.ENV, clear=False),
+                mock.patch(
+                    "parking_report.stats_cli._fetch_incidents",
+                    return_value=[self._inc("2000-000042")],
+                ),
+            ):
+                code = run(
+                    [
+                        "refresh",
+                        "-o",
+                        str(Path(tmp) / "out"),
+                        "--save-union",
+                        str(union_path),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            mode = stat.S_IMODE(os.stat(union_path).st_mode)
+            self.assertEqual(mode, 0o600, oct(mode))
+
+    def test_refresh_save_union_rechmod_preexisting_0644(self):
+        # os.open's mode applies only at creation: a pre-existing 0644
+        # union file must still end 0600 (#237 review).
+        import os
+        import stat
+
+        with tempfile.TemporaryDirectory() as tmp:
+            union_path = Path(tmp) / "union.json"
+            union_path.write_text("{}", encoding="utf-8")
+            os.chmod(union_path, 0o644)
+            with (
+                mock.patch.dict("os.environ", self.ENV, clear=False),
+                mock.patch(
+                    "parking_report.stats_cli._fetch_incidents",
+                    return_value=[self._inc("2000-000042")],
+                ),
+            ):
+                code = run(
+                    [
+                        "refresh",
+                        "-o",
+                        str(Path(tmp) / "out"),
+                        "--save-union",
+                        str(union_path),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            mode = stat.S_IMODE(os.stat(union_path).st_mode)
+            self.assertEqual(mode, 0o600, oct(mode))
+
     def test_refresh_archive_validated_before_fetch(self):
         missing = "/nonexistent/archive.json"
         with (
@@ -393,9 +492,7 @@ class RefreshCommandTest(unittest.TestCase):
                 side_effect=AssertionError("fetch must not run on a bad archive"),
             ) as fetch,
         ):
-            code = run(
-                ["refresh", "-o", str(Path(tmp) / "out"), "--archive", missing]
-            )
+            code = run(["refresh", "-o", str(Path(tmp) / "out"), "--archive", missing])
         self.assertEqual(code, 1)
         fetch.assert_not_called()
 

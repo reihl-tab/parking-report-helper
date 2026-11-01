@@ -486,6 +486,19 @@ class UnionWithFetchedTest(unittest.TestCase):
         with self.assertRaises(StatsError):
             union_with_fetched([], [{"streetname": "רחוב הדוגמה"}])
 
+    def test_fetched_internal_duplicates_are_not_archived_refreshes(self):
+        # A case_number repeated WITHIN the fetched rows overwrites its
+        # earlier fetched copy but is not an archived-row refresh (#237).
+        fetched = [self._inc("1000-5"), self._inc("1000-5", "סיום טיפול")]
+        merged, overlaps = union_with_fetched([], fetched)
+        self.assertEqual((len(merged), overlaps), (1, 0))
+        self.assertEqual(merged[0]["statusname"], "סיום טיפול")
+
+    def test_fetched_duplicate_of_archive_counts_once(self):
+        fetched = [self._inc("1000-6", "סיום טיפול"), self._inc("1000-6")]
+        merged, overlaps = union_with_fetched([self._inc("1000-6")], fetched)
+        self.assertEqual((len(merged), overlaps), (1, 1))
+
     def test_whitespace_case_numbers_match(self):
         merged, overlaps = union_with_fetched(
             [self._inc(" 1000-4 ")], [self._inc("1000-4", "סיום טיפול")]

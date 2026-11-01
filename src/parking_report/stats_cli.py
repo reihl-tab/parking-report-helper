@@ -14,6 +14,7 @@ import csv
 import datetime as dt
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -38,7 +39,6 @@ def build_parser() -> argparse.ArgumentParser:
             "exports. `build` is fully offline: files are read locally, "
             "outputs are written locally, nothing is uploaded. `refresh` "
             "contacts the municipal API to fetch the reporter's cases."
-
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -142,6 +142,15 @@ def _refresh(args) -> int:
             file=sys.stderr,
         )
         return 1
+    # strptime alone is lenient about zero-padding ("2026-1-5" parses),
+    # but the municipal API rejects that shape after login - reject it
+    # here, before any network call (#237).
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.from_date):
+        print(
+            f"{PROG}: --from must be a YYYY-MM-DD date, got {args.from_date!r}",
+            file=sys.stderr,
+        )
+        return 2
     try:
         dt.datetime.strptime(args.from_date, "%Y-%m-%d")
     except ValueError:
@@ -159,6 +168,11 @@ def _refresh(args) -> int:
     except StatsError as exc:
         print(f"{PROG}: {exc}", file=sys.stderr)
         return 1
+    # The ledger is a local file: a missing/unreadable one must fail
+    # here, not after the fetch and union write (#237).
+    plate_rows, code = _plates(args)
+    if code:
+        return code
     credentials = {
         "subscription_key": subscription_key,
         "login": {"UserName": username, "Password": password},
@@ -172,19 +186,22 @@ def _refresh(args) -> int:
         return 1
     if args.save_union:
         try:
-            Path(args.save_union).write_text(
-                json.dumps({"incidents": incidents}, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
+            # The union holds private case texts: 0600 like the registry
+            # export, never the default umask (#237).
+            fd = os.open(args.save_union, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            # os.open's mode applies only at creation; a pre-existing
+            # 0644 union file keeps its mode without this (#237 review).
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps({"incidents": incidents}, ensure_ascii=False) + "\n"
+                )
         except OSError as exc:
             print(f"{PROG}: --save-union: {exc}", file=sys.stderr)
             return 1
     summary = summarize(incidents, top_streets=args.top_streets)
     summary["inputs"] = [Path(p).name for p in args.archive] + ["GetContactCases"]
     summary["duplicates_skipped"] = duplicates
-    plate_rows, code = _plates(args)
-    if code:
-        return code
     summary["repeat_plates_count"] = len(plate_rows)
     _write_outputs(summary, plate_rows, Path(args.output))
     print(

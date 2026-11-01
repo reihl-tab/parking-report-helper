@@ -398,7 +398,10 @@ def union_with_fetched(
     Fetched rows win on overlap (they carry the current status); archived
     rows without a case_number cannot collide and are kept as-is, fetched
     rows without one raise StatsError (a live row with no identity would
-    silently duplicate its archived copy). Returns (merged, overlaps).
+    silently duplicate its archived copy). Returns (merged, overlaps),
+    where overlaps counts only fetched rows that refreshed an ARCHIVED
+    row - a duplicate case_number within the fetched rows themselves
+    overwrites the earlier fetched row without counting (#237).
     """
     keys: dict[str, int] = {}
     merged: list[dict] = []
@@ -407,6 +410,7 @@ def union_with_fetched(
         if isinstance(case_number, str) and case_number.strip():
             keys[case_number.strip()] = len(merged)
         merged.append(incident)
+    archived_keys = set(keys)
     overlaps = 0
     for incident in fetched:
         case_number = incident.get("case_number")
@@ -415,7 +419,9 @@ def union_with_fetched(
         key = case_number.strip()
         if key in keys:
             merged[keys[key]] = incident
-            overlaps += 1
+            if key in archived_keys:
+                archived_keys.discard(key)
+                overlaps += 1
         else:
             keys[key] = len(merged)
             merged.append(incident)
