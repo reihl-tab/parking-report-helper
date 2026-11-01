@@ -109,6 +109,9 @@ ENVIRONMENT: dict[str, list[tuple[str, str]]] = {
 # Argument rules enforced in code (parser.error, exit 2), not visible in the
 # argparse definitions.
 USAGE_NOTES: dict[str, str] = {
+    "p106-stats": "The build subcommand takes one or more export JSON files "
+    "and writes summary.json and the monthly/categories/streets CSVs "
+    "into --output. Fully offline: no network, no credentials.",
     "parking-report": "Give exactly one of a cars JSON file (input) or --intake "
     "DIR. --drive-folder requires --intake; --reporter and --json require "
     "--municipality.",
@@ -116,6 +119,7 @@ USAGE_NOTES: dict[str, str] = {
 
 SOURCE_MODULES: dict[str, list[str]] = {
     "parking-report": ["parking_report.cli", "parking_report.drive"],
+    "p106-stats": ["parking_report.stats", "parking_report.stats_cli"],
     "parking-report-106": ["parking_report.api_cli", "parking_report.api106"],
     "parking-report-http": ["parking_report.http_service"],
 }
@@ -233,7 +237,7 @@ def capture_parser(name: str, target: str) -> argparse.ArgumentParser:
     """The command's real parser, without running the command."""
     module_name, _, _ = target.partition(":")
     module = importlib.import_module(module_name)
-    if name == "parking-report":
+    if name in ("parking-report", "p106-stats"):
         parser: argparse.ArgumentParser = module.build_parser()
         return parser
     if name == "parking-report-106":

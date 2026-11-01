@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "gen_manpages.py"
 MAN1 = ROOT / "man" / "man1"
-SHIPPED = ("parking-report.1", "parking-report-106.1", "parking-report-http.1")
+SHIPPED = ("p106-stats.1", "parking-report.1", "parking-report-106.1", "parking-report-http.1")
 OTHER_DATE = "1999-12-31"
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
@@ -168,7 +168,7 @@ class DeterministicGeneration206(unittest.TestCase):
                 out = Path(tmp) / label
                 result = run_gen("--output", str(out), env=env)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout, "wrote 3 man pages\n")
+                self.assertEqual(result.stdout, "wrote 4 man pages\n")
                 outputs[label] = read_tree(out)
         expected = {k: v.encode("utf-8") for k, v in self.pages.items()}
         for label, tree in outputs.items():
@@ -293,7 +293,7 @@ class DriftDetection206(unittest.TestCase):
             self.assertEqual(read_tree(pages), good)
             result = run_gen("--check", "--output", str(pages), env=env)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, "3 man pages up to date\n")
+            self.assertEqual(result.stdout, "4 man pages up to date\n")
 
 
 @unittest.skipUnless(MAN1.is_dir(), "man/ is not copied into the Docker test image")

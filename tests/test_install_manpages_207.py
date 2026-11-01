@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "install_manpages.py"
 MAN1 = ROOT / "man" / "man1"
-PAGES = ("parking-report.1", "parking-report-106.1", "parking-report-http.1")
+PAGES = ("p106-stats.1", "parking-report.1", "parking-report-106.1", "parking-report-http.1")
 VICTIM_BYTES = b"synthetic victim 207, must not change\n"
 VICTIM_MODE = 0o600
 DESTINATION_FAILED = "install_manpages: failed at stage=destination error=ValueError\n"

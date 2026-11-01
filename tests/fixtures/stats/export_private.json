@@ -1,0 +1,28 @@
+{
+  "incidents": [
+    {
+      "caseId": "synthetic-2000-900001",
+      "case_number": "2000-900001",
+      "createdon": "2026-06-02T09:00:00",
+      "modifiedon": "2026-06-02T09:00:00",
+      "ClosedDateIncident": "2026-06-02T11:00:00",
+      "streetname": "רחוב הפרטיות",
+      "housenumber": "7",
+      "subjectname": "חניה אסורה - חניה על מדרכה",
+      "statusname": "סיום טיפול",
+      "description": "רכב 12-345-67 חונה על המדרכה; דווח על ידי ישראל ישראלי"
+    },
+    {
+      "caseId": "synthetic-2000-900002",
+      "case_number": "2000-900002",
+      "createdon": "2026-06-03T10:00:00",
+      "modifiedon": "2026-06-03T10:00:00",
+      "ClosedDateIncident": null,
+      "streetname": "רחוב הפרטיות",
+      "housenumber": "9",
+      "subjectname": "רכב נטוש",
+      "statusname": "בטיפול",
+      "description": "98-765-43 נטוש ליד הבית של משה כהן"
+    }
+  ]
+}

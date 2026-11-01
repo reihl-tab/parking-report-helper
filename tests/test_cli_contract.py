@@ -20,7 +20,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
-from parking_report import api_cli, cli, http_service
+from parking_report import api_cli, cli, http_service, stats_cli
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs" / "CLI-CONTRACT.md"
@@ -136,6 +136,21 @@ class ContractDocTest(unittest.TestCase):
         self.assertEqual(
             describe(api_cli_parser()),
             documented(self.contract["commands"]["parking-report-106"]),
+        )
+
+    def test_p106_stats_build_options_match_parser(self) -> None:
+        spec = self.contract["commands"]["p106-stats"]
+        parser = stats_cli.build_parser()
+        self.assertEqual(describe(parser), documented(spec))
+        subparsers = next(
+            action
+            for action in parser._actions
+            if isinstance(action, argparse._SubParsersAction)
+        )
+        build = spec["subcommands"]["build"]
+        self.assertEqual(
+            describe(subparsers.choices["build"]),
+            (build["positionals"], build["options"]),
         )
 
     def test_planted_doc_drift_is_detected(self) -> None:

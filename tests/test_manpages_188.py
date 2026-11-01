@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 MAN1 = ROOT / "man" / "man1"
 FAKE_SECRET = "synthetic-secret-188-do-not-log"
-SHIPPED = {"parking-report", "parking-report-106", "parking-report-http"}
+SHIPPED = {"p106-stats", "parking-report", "parking-report-106", "parking-report-http"}
 
 
 def load(name):
@@ -286,7 +286,7 @@ class DiagnosticsTests(unittest.TestCase):
         result = self.run_gen(env=synthetic_env())
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stderr, "")
-        self.assertEqual(result.stdout, "wrote 3 man pages\n")
+        self.assertEqual(result.stdout, "wrote 4 man pages\n")
 
     def test_debug_prints_only_stage_lines(self):
         for args, env in (

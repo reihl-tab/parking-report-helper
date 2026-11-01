@@ -1,0 +1,45 @@
+{
+ "incidents": [
+  {
+   "caseId": "synthetic-2000-000010",
+   "case_number": "2000-000010",
+   "createdon": "2026-07-01T08:00:00",
+   "modifiedon": "2026-07-01T08:00:00",
+   "ClosedDateIncident": "2026-07-01T08:45:00",
+   "streetname": "רחוב הדוגמה",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "סיום טיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000011",
+   "case_number": "2000-000011",
+   "createdon": "2026-07-02T08:00:00",
+   "modifiedon": "2026-07-02T08:00:00",
+   "ClosedDateIncident": "2026-07-02T09:00:00",
+   "streetname": "רחוב הדוגמה",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "סיום טיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000012",
+   "case_number": "2000-000012",
+   "createdon": "2026-07-03T08:00:00",
+   "modifiedon": "2026-07-03T08:00:00",
+   "ClosedDateIncident": null,
+   "streetname": "שדרות הבדיקה",
+   "housenumber": "1",
+   "subjectname": "בחינת בקשה להתקנת עמוד מחסום לחניה",
+   "statusname": "בטיפול"
+  },
+  {
+   "caseId": "synthetic-no-number",
+   "createdon": "2026-07-04T08:00:00",
+   "ClosedDateIncident": "2026-07-04T09:30:00",
+   "streetname": "רחוב הסינתטי",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "סיום טיפול"
+  }
+ ]
+}

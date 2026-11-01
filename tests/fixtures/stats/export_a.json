@@ -1,0 +1,114 @@
+{
+ "incidents": [
+  {
+   "caseId": "synthetic-2000-000001",
+   "case_number": "2000-000001",
+   "createdon": "2026-05-01T08:00:00",
+   "modifiedon": "2026-05-01T08:00:00",
+   "ClosedDateIncident": "2026-05-01T08:30:00",
+   "streetname": "רחוב הדוגמה",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "סיום טיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000002",
+   "case_number": "2000-000002",
+   "createdon": "2026-05-01T09:00:00",
+   "modifiedon": "2026-05-01T09:00:00",
+   "ClosedDateIncident": "2026-05-01T17:00:00",
+   "streetname": "רחוב הדוגמה",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "סיום טיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000003",
+   "case_number": "2000-000003",
+   "createdon": "2026-05-02T10:00:00",
+   "modifiedon": "2026-05-02T10:00:00",
+   "ClosedDateIncident": "2026-05-03T10:00:00",
+   "streetname": "שדרות הבדיקה",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה- אדום לבן / אין עצירה",
+   "statusname": "סיום טיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000004",
+   "case_number": "2000-000004",
+   "createdon": "2026-05-03T11:00:00",
+   "modifiedon": "2026-05-03T11:00:00",
+   "ClosedDateIncident": "2026-05-11T11:00:00",
+   "streetname": "שדרות הבדיקה",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "סיום טיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000005",
+   "case_number": "2000-000005",
+   "createdon": "2026-06-01T08:00:00",
+   "modifiedon": "2026-06-01T08:00:00",
+   "ClosedDateIncident": "2026-06-20T08:00:00",
+   "streetname": "רחוב הדוגמה",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "סיום טיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000006",
+   "case_number": "2000-000006",
+   "createdon": "2026-06-02T08:00:00",
+   "modifiedon": "2026-06-02T08:00:00",
+   "ClosedDateIncident": null,
+   "streetname": "רחוב הדוגמה",
+   "housenumber": "1",
+   "subjectname": "בחינת בקשה להתקנת עמוד מחסום לחניה",
+   "statusname": "בטיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000007",
+   "case_number": "2000-000007",
+   "createdon": "2026-06-03T08:00:00",
+   "modifiedon": "2026-06-03T08:00:00",
+   "ClosedDateIncident": "not-a-date",
+   "streetname": null,
+   "housenumber": "1",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "בטיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000008",
+   "case_number": "2000-000008",
+   "createdon": null,
+   "modifiedon": null,
+   "ClosedDateIncident": null,
+   "streetname": "רחוב הסינתטי",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "בטיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000009",
+   "case_number": "2000-000009",
+   "createdon": "2026-06-04T08:00:00Z",
+   "modifiedon": "2026-06-04T08:00:00Z",
+   "ClosedDateIncident": "2026-06-04T08:10:00+00:00",
+   "streetname": "רחוב הסינתטי",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה- אדום לבן / אין עצירה",
+   "statusname": "סיום טיפול"
+  },
+  {
+   "caseId": "synthetic-2000-000010",
+   "case_number": "2000-000010",
+   "createdon": "2026-07-01T08:00:00",
+   "modifiedon": "2026-07-01T08:00:00",
+   "ClosedDateIncident": "2026-07-01T08:45:00",
+   "streetname": "רחוב הדוגמה",
+   "housenumber": "1",
+   "subjectname": "חניה אסורה - חניה על מדרכה",
+   "statusname": "סיום טיפול"
+  }
+ ]
+}
