@@ -124,8 +124,26 @@ check clean when run explicitly with the source tree on the path,
 (also with `--strict`); CI does not run that.
 
 After changing a flag, help text or exit code, update the JSON block and run
-the generator in the same PR. The page date (`PAGE_DATE` in the generator) is
-fixed so output is reproducible; bump it with the package version.
+the generator in the same PR.
+
+Page date (#206). The `.TH` date on every page is the fixed `PAGE_DATE`
+string in `scripts/gen_manpages.py`. Generation never reads the wall clock,
+the time zone, the locale, `SOURCE_DATE_EPOCH` or any other environment
+setting for it, so the same tree always gives the same bytes
+(`tests/test_manpages_date_206.py`). Keeping the date current is a **manual
+release checklist, not an automated check**: nothing compares `PAGE_DATE`
+with a release date or fails when it is old. When a maintainer changes the
+package version for a release (`version` in `pyproject.toml`,
+`parking_report.__version__` and `package_version` in the JSON block above):
+
+1. Set `PAGE_DATE` to the release date (`YYYY-MM-DD`) in the same PR.
+2. With the `api` extra installed, run `python scripts/gen_manpages.py`,
+   then `python scripts/gen_manpages.py --check` (exit 0).
+3. Commit the regenerated `man/man1/*.1` with the version change.
+
+A `PAGE_DATE` change without step 2 makes `--check` and the drift test fail.
+Between releases the date stays as it is, even when pages are regenerated
+for a help-text change.
 
 ## Known gaps (measured, not fixed here)
 
