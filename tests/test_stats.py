@@ -10,8 +10,11 @@ from parking_report.stats import (
     StatsError,
     _quantile,
     closure_days,
+    display_plate,
     load_incidents,
     parse_datetime,
+    plate_digits,
+    plates_summary,
     summarize,
 )
 
@@ -211,3 +214,239 @@ class ClosureDaysTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DisplayPlateTest(unittest.TestCase):
+    def test_compact_seven_digit_gets_dashes(self):
+        self.assertEqual(display_plate("1234567"), "12-345-67")
+
+    def test_compact_eight_digit_gets_dashes(self):
+        self.assertEqual(display_plate("44556677"), "445-56-677")
+
+
+class PlateDigitsTest(unittest.TestCase):
+    def test_standard_forms_accepted(self):
+        self.assertEqual(plate_digits("1234567"), "1234567")
+        self.assertEqual(plate_digits("44556677"), "44556677")
+        self.assertEqual(plate_digits("12-345-67"), "1234567")
+        self.assertEqual(plate_digits("445-56-677"), "44556677")
+        self.assertEqual(plate_digits("  1234567 "), "1234567")
+
+    def test_nonstandard_plates_rejected(self):
+        for bad in (
+            "99-999-ז",  # Hebrew-letter special format: not published
+            "=1234567",  # spreadsheet formula prefix
+            "+1234567",
+            "@1234567",
+            "123",  # too short
+            "123456789",  # too long
+            "12-34-567",  # dashes in non-standard positions
+            "abc-defg-h",
+            "1234567\u202e",  # bidi control
+            "",
+        ):
+            self.assertIsNone(plate_digits(bad), bad)
+
+
+class PlatesSummaryTest(unittest.TestCase):
+    """Repeat-plate aggregate from a synthetic ledger (issue #220).
+
+    Every plate below is fake; real numbers must never enter fixtures.
+    """
+
+    def _write_ledger(
+        self, tmp: Path, rows: list[tuple[str, str, str]], *, header: str | None = None
+    ) -> Path:
+        import csv as _csv
+
+        path = tmp / "ledger.csv"
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = _csv.writer(handle)
+            writer.writerow(
+                header.split(",")
+                if header
+                else ["filed_date", "plate", "municipal_ref", "event_type"]
+            )
+            writer.writerows(rows)
+        return path
+
+    def test_threshold_grouping_and_ordering(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            ledger = self._write_ledger(
+                Path(td),
+                [
+                    ("2026-10-01", "1122233", "2601-000001"),
+                    ("2026-10-02", "11-222-33", "2601-000002"),  # same car, dashed
+                    ("2026-10-05", "1122233", "2601-000003"),
+                    ("2026-09-20", "44556677", "2601-000004"),
+                    ("2026-10-03", "44556677", "2601-000005"),
+                    ("2026-10-04", "44556677", "2601-000006"),
+                    ("2026-10-06", "88-977-66", "2601-000007"),
+                    ("2026-10-07", "88-977-66", "2601-000008"),
+                    ("2026-10-08", "88-977-66", "2601-000009"),
+                    ("2026-10-09", "5566677", "2601-000010"),  # below threshold
+                    ("2026-10-09", "", "2601-000011"),  # no plate: skipped
+                ],
+            )
+            rows, _ = plates_summary(ledger)
+        self.assertEqual(
+            rows,
+            [
+                {"plate": "11-222-33", "reports": 3},
+                {"plate": "445-56-677", "reports": 3},
+                {"plate": "88-977-66", "reports": 3},
+            ],
+        )
+
+    def test_same_case_recorded_twice_counts_once(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            ledger = self._write_ledger(
+                Path(td),
+                [
+                    ("2026-10-01", "1122233", "2601-000001"),
+                    ("2026-10-01", "1122233", "2601-000001"),  # duplicate recording
+                    ("2026-10-02", "1122233", "2601-000002"),
+                    ("2026-10-03", "1122233", "2601-000003"),
+                ],
+            )
+            rows, _ = plates_summary(ledger)
+            self.assertEqual(rows, [{"plate": "11-222-33", "reports": 3}])
+
+    def test_missing_plate_column_is_a_loud_error(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            ledger = self._write_ledger(
+                Path(td), [("2026-10-01", "חניה")], header="filed_date,event_type"
+            )
+            with self.assertRaises(StatsError):
+                plates_summary(ledger)
+
+    def test_missing_filed_date_column_is_a_loud_error(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            ledger = self._write_ledger(
+                Path(td), [("1122233", "חניה")], header="plate,event_type"
+            )
+            with self.assertRaises(StatsError):
+                plates_summary(ledger)
+
+    def test_partial_id_overlap_is_one_report(self):
+        # Reviewer edge case: a report first recorded with only folder_id,
+        # later with municipal_ref + the same folder_id, plus one other
+        # report -> 2 reports, not 3.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "ledger.csv"
+            path.write_text(
+                "filed_date,plate,folder_id,municipal_ref\n"
+                "2026-10-01,1122233,folder-a,\n"
+                "2026-10-01,1122233,folder-a,2601-000001\n"
+                "2026-10-02,1122233,folder-b,2601-000002\n",
+                encoding="utf-8",
+            )
+            rows, _ = plates_summary(path, min_count=2)
+            self.assertEqual(rows, [{"plate": "11-222-33", "reports": 2}])
+            rows, _ = plates_summary(path)
+            self.assertEqual(rows, [])
+
+    def test_id_chain_across_rows_is_one_report(self):
+        # folder-only row + bridging row + ref-only row: one report.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "ledger.csv"
+            path.write_text(
+                "filed_date,plate,folder_id,municipal_ref\n"
+                "2026-10-01,1122233,folder-a,\n"
+                "2026-10-01,1122233,folder-a,2601-000001\n"
+                "2026-10-01,1122233,,2601-000001\n",
+                encoding="utf-8",
+            )
+            rows, _ = plates_summary(path, min_count=1)
+            self.assertEqual(rows, [{"plate": "11-222-33", "reports": 1}])
+
+    def test_rows_without_any_id_are_excluded(self):
+        # Reviewer blocker: an id-less copy of an identified report must
+        # not inflate the count - exclude id-less rows entirely and
+        # report how many were skipped.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "ledger.csv"
+            path.write_text(
+                "filed_date,plate,folder_id,municipal_ref,street\n"
+                "2026-10-01,1122233,folder-a,2601-000001,רחוב בדיקה\n"
+                "2026-10-02,1122233,folder-b,2601-000002,רחוב בדיקה\n"
+                "2026-10-01,1122233,,,רחוב בדיקה\n"  # id-less copy: excluded
+                "2026-10-01,1122233,,,רחוב בדיקה\n",
+                encoding="utf-8",
+            )
+            rows, skipped = plates_summary(path, min_count=2)
+            self.assertEqual(rows, [{"plate": "11-222-33", "reports": 2}])
+            self.assertEqual(skipped, 2)
+            # id-less rows alone can never qualify a plate
+            rows, skipped = plates_summary(path, min_count=3)
+            self.assertEqual(rows, [])
+
+    def test_invalid_filed_dates_are_excluded(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "ledger.csv"
+            path.write_text(
+                "filed_date,plate,municipal_ref\n"
+                "2026-10-01,1122233,2601-000001\n"
+                "2026-02-30,1122233,2601-000002\n"  # impossible date
+                ",1122233,2601-000003\n"  # blank date
+                "next Tuesday,1122233,2601-000004\n"
+                "2026-10-02,1122233,2601-000005\n",
+                encoding="utf-8",
+            )
+            rows, skipped = plates_summary(path, min_count=1)
+            self.assertEqual(rows, [{"plate": "11-222-33", "reports": 2}])
+            self.assertEqual(skipped, 3)
+
+    def test_malformed_csv_is_a_loud_error(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "ledger.csv"
+            path.write_text(
+                "filed_date,plate,municipal_ref\n"
+                '2026-10-01,"1122233,2601-000001\n',  # unterminated quote
+                encoding="utf-8",
+            )
+            with self.assertRaises(StatsError):
+                plates_summary(path)
+
+    def test_invalid_utf8_is_a_loud_error(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "ledger.csv"
+            path.write_bytes(b"filed_date,plate\n2026-10-01,\xff\xfe\n")
+            with self.assertRaises(StatsError):
+                plates_summary(path)
+
+    def test_min_count_is_configurable(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            ledger = self._write_ledger(
+                Path(td),
+                [
+                    ("2026-10-01", "1122233", "2601-000001"),
+                    ("2026-10-02", "1122233", "2601-000002"),
+                ],
+            )
+            rows, _ = plates_summary(ledger)
+            self.assertEqual(rows, [])
+            rows, _ = plates_summary(ledger, min_count=2)
+            self.assertEqual(len(rows), 1)

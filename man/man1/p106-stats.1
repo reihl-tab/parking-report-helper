@@ -38,6 +38,11 @@ Required.
 \fB\-\-top\-streets\fR \fITOP_STREETS\fR
 How many streets to keep in by_street (default: 20) Default: 20.
 .TP
+\fB\-\-plates\-ledger\fR \fIPLATES_LEDGER\fR
+Optional private filing\-ledger CSV; adds a repeat\-plates aggregate
+(plates.csv with plate,reports for 3+ distinct filed reports) \- the
+ledger itself never leaves the machine.
+.TP
 \fIinputs\fR
 Reports_raw.json export file(s)
 .SH EXIT STATUS
@@ -47,8 +52,8 @@ Summary.json, the CSV tables and report.html written to the output
 directory; one summary line on stdout.
 .TP
 .B 1
-Input error (missing, unreadable or invalid export file), `p106\-stats:
-\&...` on stderr.
+Input error (missing, unreadable or invalid export file; or an
+unreadable \-\-plates\-ledger file), \fBp106\-stats: ...\fR on stderr.
 .TP
 .B 2
 Usage error (argparse, or an invalid value such as \-\-top\-streets 0),

@@ -23,9 +23,11 @@ Aggregation notes:
 
 from __future__ import annotations
 
+import csv
 import datetime as dt
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -183,6 +185,144 @@ def _by_neighborhood(
         area = neighborhoods.get(street, "(אחר)")
         counts[area] = counts.get(area, 0) + 1
     return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+_PLATE_FORMS = (
+    re.compile(r"^[0-9]{7}$"),
+    re.compile(r"^[0-9]{8}$"),
+    re.compile(r"^[0-9]{2}-[0-9]{3}-[0-9]{2}$"),
+    re.compile(r"^[0-9]{3}-[0-9]{2}-[0-9]{3}$"),
+)
+
+
+def plate_digits(raw: str) -> str | None:
+    """Digits of a standard Israeli plate, or None for anything else.
+
+    Only pure 7/8-digit numbers, optionally dashed in the standard
+    positions, are publishable; free text, Hebrew-letter formats,
+    bidi/control characters and formula prefixes are all rejected.
+    """
+    text = raw.strip()
+    for pattern in _PLATE_FORMS:
+        if pattern.fullmatch(text):
+            return text.replace("-", "")
+    return None
+
+
+def display_plate(digits: str) -> str:
+    """Canonical dashed display form for 7/8-digit plates."""
+    if len(digits) == 7:
+        return f"{digits[:2]}-{digits[2:5]}-{digits[5:]}"
+    if len(digits) == 8:
+        return f"{digits[:3]}-{digits[3:5]}-{digits[5:]}"
+    return digits
+
+
+def _find(parent: list[int], i: int) -> int:
+    while parent[i] != i:
+        parent[i] = parent[parent[i]]
+        i = parent[i]
+    return i
+
+
+def _union(parent: list[int], a: int, b: int) -> None:
+    ra, rb = _find(parent, a), _find(parent, b)
+    if ra != rb:
+        parent[ra] = rb
+
+
+def _report_groups(rows: list[dict[str, str | None]]) -> int:
+    """Distinct reports: rows sharing ANY identifier are the same report.
+
+    Union-find over folder_id and municipal_ref (a report may first be
+    recorded with only a folder_id and later gain its municipal_ref).
+    Callers must exclude rows lacking both identifiers before calling.
+    """
+    parent = list(range(len(rows)))
+    by_folder: dict[str, int] = {}
+    by_ref: dict[str, int] = {}
+    for i, row in enumerate(rows):
+        folder = (row.get("folder_id") or "").strip()
+        ref = (row.get("municipal_ref") or "").strip()
+        if folder:
+            if folder in by_folder:
+                _union(parent, i, by_folder[folder])
+            else:
+                by_folder[folder] = i
+        if ref:
+            if ref in by_ref:
+                _union(parent, i, by_ref[ref])
+            else:
+                by_ref[ref] = i
+    return len({_find(parent, i) for i in range(len(rows))})
+
+
+def _valid_filed_date(raw: str) -> bool:
+    """A real ISO calendar date (rejects blanks and 2026-02-30)."""
+    text = raw.strip()
+    if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", text):
+        return False
+    try:
+        dt.date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
+def plates_summary(
+    ledger_path: str | Path, *, min_count: int = 3
+) -> tuple[list[dict[str, Any]], int]:
+    """Repeat-plate aggregate from the private filing ledger.
+
+    Returns (rows, skipped). The ledger never leaves the machine; only
+    the thresholded aggregate (plate, count) may be published, and only
+    canonical dashed standard plates appear in it. Reports are
+    deduplicated by shared identifiers (see _report_groups) so a case
+    recorded twice does not inflate a plate past the threshold. Rows
+    excluded from the counts (counted in ``skipped``):
+
+    - no plate, or a plate that is not a standard 7/8-digit number
+      (optionally dashed in the standard positions);
+    - no valid filed_date;
+    - no identifier at all (neither folder_id nor municipal_ref) - an
+      unidentifiable copy of an identified report must not be able to
+      push a plate past the threshold.
+    """
+    by_plate: dict[str, list[dict[str, str | None]]] = {}
+    skipped = 0
+    try:
+        with open(ledger_path, encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle, strict=True)
+            header = set(reader.fieldnames or ())
+            missing = {"plate", "filed_date"} - header
+            if missing:
+                raise StatsError(
+                    f"ledger {ledger_path}: missing column(s) {sorted(missing)}"
+                )
+            for row in reader:
+                digits = plate_digits(row.get("plate") or "")
+                if digits is None or not _valid_filed_date(row.get("filed_date") or ""):
+                    skipped += 1
+                    continue
+                if (
+                    not (row.get("folder_id") or "").strip()
+                    and not (row.get("municipal_ref") or "").strip()
+                ):
+                    skipped += 1
+                    continue
+                by_plate.setdefault(digits, []).append(row)
+    except csv.Error as exc:
+        raise StatsError(f"ledger {ledger_path}: malformed CSV: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise StatsError(f"ledger {ledger_path}: not valid UTF-8: {exc}") from exc
+    rows: list[dict[str, Any]] = []
+    for digits, plate_rows in by_plate.items():
+        count = _report_groups(plate_rows)
+        if count < min_count:
+            continue
+        rows.append({"plate": display_plate(digits), "reports": count})
+    rows.sort(key=lambda r: (-r["reports"], r["plate"]))
+    return rows, skipped
 
 
 def summarize(
