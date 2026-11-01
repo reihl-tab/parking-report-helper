@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.13-slim AS build
+FROM python:3.13-slim@sha256:2d44738ebf4ce5f63b9d9ea871e9c7cfdc0426f7b0c97cac915fd88ded1d86bb AS build
 WORKDIR /src
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
 
 # Run the test suite: docker build --target test .
-FROM python:3.13-slim AS test
+FROM python:3.13-slim@sha256:2d44738ebf4ce5f63b9d9ea871e9c7cfdc0426f7b0c97cac915fd88ded1d86bb AS test
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 ENV PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
@@ -19,7 +19,7 @@ COPY scripts ./scripts
 COPY docs ./docs
 RUN python -m unittest discover -s tests -v
 
-FROM python:3.13-slim AS runtime-base
+FROM python:3.13-slim@sha256:2d44738ebf4ce5f63b9d9ea871e9c7cfdc0426f7b0c97cac915fd88ded1d86bb AS runtime-base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8
