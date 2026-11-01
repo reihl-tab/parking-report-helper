@@ -354,3 +354,62 @@ class RefreshCommandTest(unittest.TestCase):
             with mock.patch.dict("os.environ", {}, clear=True):
                 code = run(["refresh", "-o", str(Path(tmp) / "out")])
             self.assertEqual(code, 1)
+
+    def test_refresh_missing_env_never_fetches(self):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            mock.patch.dict("os.environ", {}, clear=True),
+            mock.patch(
+                "parking_report.stats_cli._fetch_incidents",
+                side_effect=AssertionError("fetch must not run without env"),
+            ) as fetch,
+        ):
+            code = run(["refresh", "-o", str(Path(tmp) / "out")])
+        self.assertEqual(code, 1)
+        fetch.assert_not_called()
+
+    def test_refresh_bad_from_date_exits_2_before_fetch(self):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            mock.patch.dict("os.environ", self.ENV, clear=False),
+            mock.patch(
+                "parking_report.stats_cli._fetch_incidents",
+                side_effect=AssertionError("fetch must not run on a bad date"),
+            ) as fetch,
+        ):
+            code = run(
+                ["refresh", "-o", str(Path(tmp) / "out"), "--from", "not-a-date"]
+            )
+        self.assertEqual(code, 2)
+        fetch.assert_not_called()
+
+    def test_refresh_archive_validated_before_fetch(self):
+        missing = "/nonexistent/archive.json"
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            mock.patch.dict("os.environ", self.ENV, clear=False),
+            mock.patch(
+                "parking_report.stats_cli._fetch_incidents",
+                side_effect=AssertionError("fetch must not run on a bad archive"),
+            ) as fetch,
+        ):
+            code = run(
+                ["refresh", "-o", str(Path(tmp) / "out"), "--archive", missing]
+            )
+        self.assertEqual(code, 1)
+        fetch.assert_not_called()
+
+    def test_refresh_save_union_failure_exits_1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            bad_union = Path(tmp) / "no-such-dir" / "union.json"
+            with (
+                mock.patch.dict("os.environ", self.ENV, clear=False),
+                mock.patch(
+                    "parking_report.stats_cli._fetch_incidents",
+                    return_value=[self._inc("2000-000042")],
+                ),
+            ):
+                code = run(["refresh", "-o", str(out), "--save-union", str(bad_union)])
+            self.assertEqual(code, 1)
+            self.assertFalse((out / "summary.json").exists())

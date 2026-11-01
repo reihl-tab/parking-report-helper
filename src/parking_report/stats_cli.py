@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as dt
 import json
 import os
 import sys
@@ -34,8 +35,10 @@ def build_parser() -> argparse.ArgumentParser:
         prog=PROG,
         description=(
             "Generate local statistics from municipal 106 reports_raw.json "
-            "exports. Fully offline: files are read locally, outputs are "
-            "written locally, nothing is uploaded."
+            "exports. `build` is fully offline: files are read locally, "
+            "outputs are written locally, nothing is uploaded. `refresh` "
+            "contacts the municipal API to fetch the reporter's cases."
+
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -139,6 +142,23 @@ def _refresh(args) -> int:
             file=sys.stderr,
         )
         return 1
+    try:
+        dt.datetime.strptime(args.from_date, "%Y-%m-%d")
+    except ValueError:
+        print(
+            f"{PROG}: --from must be a YYYY-MM-DD date, got {args.from_date!r}",
+            file=sys.stderr,
+        )
+        return 2
+    # Validate the local inputs before any network call or login.
+    try:
+        archived: list[dict] = []
+        duplicates = 0
+        if args.archive:
+            archived, duplicates = load_incidents(args.archive)
+    except StatsError as exc:
+        print(f"{PROG}: {exc}", file=sys.stderr)
+        return 1
     credentials = {
         "subscription_key": subscription_key,
         "login": {"UserName": username, "Password": password},
@@ -146,35 +166,25 @@ def _refresh(args) -> int:
     reporter = {"ContactIdNumber": id_number, "ContactIdType": "100000000"}
     try:
         fetched = _fetch_incidents(credentials, reporter, args.from_date)
-        archived: list[dict] = []
-        duplicates = 0
-        if args.archive:
-            archived, duplicates = load_incidents(args.archive)
         incidents, overlaps = union_with_fetched(archived, fetched)
     except (StatsError, InputError, APIError) as exc:
         print(f"{PROG}: {exc}", file=sys.stderr)
         return 1
     if args.save_union:
-        Path(args.save_union).write_text(
-            json.dumps({"incidents": incidents}, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        try:
+            Path(args.save_union).write_text(
+                json.dumps({"incidents": incidents}, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            print(f"{PROG}: --save-union: {exc}", file=sys.stderr)
+            return 1
     summary = summarize(incidents, top_streets=args.top_streets)
     summary["inputs"] = [Path(p).name for p in args.archive] + ["GetContactCases"]
     summary["duplicates_skipped"] = duplicates
-    plate_rows: list[dict] = []
-    if args.plates_ledger:
-        try:
-            plate_rows, skipped_ids = plates_summary(args.plates_ledger)
-        except (OSError, StatsError) as exc:
-            print(f"{PROG}: --plates-ledger: {exc}", file=sys.stderr)
-            return 1
-        if skipped_ids:
-            print(
-                f"{PROG}: --plates-ledger: {skipped_ids} row(s) excluded "
-                "(no identifiers, invalid plate or invalid filed_date)",
-                file=sys.stderr,
-            )
+    plate_rows, code = _plates(args)
+    if code:
+        return code
     summary["repeat_plates_count"] = len(plate_rows)
     _write_outputs(summary, plate_rows, Path(args.output))
     print(

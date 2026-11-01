@@ -12,8 +12,9 @@ reports_raw.json exports
 \fIcommand\fR
 .SH DESCRIPTION
 Generate local statistics from municipal 106 reports_raw.json exports.
-Fully offline: files are read locally, outputs are written locally,
-nothing is uploaded.
+\fBbuild\fR is fully offline: files are read locally, outputs are written
+locally, nothing is uploaded. \fBrefresh\fR contacts the municipal API to
+fetch the reporter's cases.
 .PP
 The build subcommand takes one or more export JSON files and writes
 summary.json, the monthly/categories/streets CSVs and report.html into
@@ -78,12 +79,14 @@ Summary.json, the CSV tables and report.html written to the output
 directory; one summary line on stdout.
 .TP
 .B 1
-Input error (missing, unreadable or invalid export file; or an
-unreadable \-\-plates\-ledger file), \fBp106\-stats: ...\fR on stderr.
+Input error (missing, unreadable or invalid export file; an unreadable
+\-\-plates\-ledger file; refresh: missing environment variables, a failed
+fetch or union, or an unwritable \-\-save\-union path), \fBp106\-stats: ...\fR
+on stderr.
 .TP
 .B 2
-Usage error (argparse, or an invalid value such as \-\-top\-streets 0),
-message on stderr.
+Usage error (argparse, or an invalid value such as \-\-top\-streets 0 or
+a refresh \-\-from that is not a YYYY\-MM\-DD date), message on stderr.
 .SH SEE ALSO
 .BR parking\-report (1),
 .BR parking\-report\-106 (1),
