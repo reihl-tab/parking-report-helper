@@ -124,6 +124,15 @@ class SummarizeTest(unittest.TestCase):
         self.assertTrue(all(key.startswith("2026-W") for key in by_week))
         self.assertEqual(sum(by_week.values()), 12)
         self.assertEqual(next(iter(self.summary["hotspots"])), "רחוב הדוגמה 1")
+
+    def test_hotspots_below_the_minimum_count_floor_are_dropped(self):
+        # Fixture: "רחוב הסינתטי 1" appears twice - under the default floor of 3.
+        self.assertNotIn("רחוב הסינתטי 1", self.summary["hotspots"])
+        self.assertEqual(
+            list(self.summary["hotspots"]), ["רחוב הדוגמה 1", "שדרות הבדיקה 1"]
+        )
+        lowered = summarize(self.incidents, min_hotspot_count=2)
+        self.assertIn("רחוב הסינתטי 1", lowered["hotspots"])
         self.assertIsNone(self.summary["by_neighborhood"])
 
     def test_neighborhood_mapping(self):

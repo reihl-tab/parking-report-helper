@@ -15,6 +15,10 @@ Aggregation notes:
   ``total_incidents`` and in every date-independent aggregate, but in no
   month: it cannot be placed on the timeline, and guessing a month would
   be worse than dropping it there.
+- Hotspots (street + house number) carry a minimum-count floor: a spot
+  reported fewer than ``min_hotspot_count`` times (default 3) never
+  appears in any output. The floor exists so a published aggregate can
+  never single out a one-off address (approved heat-map design, 1.11).
 """
 
 from __future__ import annotations
@@ -153,7 +157,7 @@ def _category_aggregates(
     return ordered, closures
 
 
-def _hotspots(incidents: list[dict], limit: int) -> dict[str, int]:
+def _hotspots(incidents: list[dict], limit: int, min_count: int) -> dict[str, int]:
     spots: dict[str, int] = {}
     for incident in incidents:
         street = _text(incident, "streetname", NO_STREET)
@@ -162,7 +166,7 @@ def _hotspots(incidents: list[dict], limit: int) -> dict[str, int]:
         spot = f"{street} {number}".strip()
         spots[spot] = spots.get(spot, 0) + 1
     ordered = sorted(spots.items(), key=lambda kv: (-kv[1], kv[0]))
-    return dict(ordered[:limit])
+    return {spot: count for spot, count in ordered[:limit] if count >= min_count}
 
 
 def _by_neighborhood(
@@ -183,6 +187,7 @@ def summarize(
     *,
     top_streets: int = 20,
     top_hotspots: int = 10,
+    min_hotspot_count: int = 3,
     weeks: int = 12,
     neighborhoods: dict[str, str] | None = None,
 ) -> dict:
@@ -214,7 +219,7 @@ def summarize(
         },
         "by_month": dict(sorted(_count(months).items())),
         "by_week": dict(list(sorted(_count(iso_weeks).items()))[-weeks:]),
-        "hotspots": _hotspots(incidents, top_hotspots),
+        "hotspots": _hotspots(incidents, top_hotspots, min_hotspot_count),
         "by_neighborhood": _by_neighborhood(incidents, neighborhoods),
         "by_category": by_category,
         "by_street": dict(

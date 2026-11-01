@@ -1,7 +1,7 @@
 """`p106-stats` command line: export file in, local statistics out (issue #210).
 
-Milestone 1 writes machine-readable outputs (summary.json + CSVs). Charts and
-the self-contained HTML report land in the follow-up PRs on the same issue.
+`build` writes machine-readable outputs (summary.json + CSVs) and a
+self-contained RTL HTML report (report.html) with pure-SVG charts (#212).
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         "-o",
         required=True,
-        help="output directory for summary.json and the CSV tables",
+        help="output directory for summary.json, the CSV tables and report.html",
     )
     build.add_argument(
         "--top-streets",
