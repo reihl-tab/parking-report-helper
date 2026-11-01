@@ -2,12 +2,14 @@ name: Manual dedicated GPG signing test
 on:
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: manual-dedicated-gpg-signing
   cancel-in-progress: false
 jobs:
   signing-test:
+    permissions:
+      contents: write
     if: ${{ github.repository == 'reihlinstinct/parking-report-helper' && github.ref == 'refs/heads/main' && github.actor == github.repository_owner }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
