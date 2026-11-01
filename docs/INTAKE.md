@@ -1,7 +1,7 @@
 # Intake from private GitHub storage
 
 Original photos and report.json records are saved into a separate PRIVATE GitHub
-repository, parking-reports, with one folder per report under reports/. The public
+repository, with one folder per report under reports/. The public
 helper repository contains code and synthetic fixtures only. The private repository
 also hosts its manual workflow, so no cross-repository data credential is needed.
 The tool reads a local checkout and prepares drafts. It never submits anything.
@@ -59,16 +59,18 @@ workflow logs or upload them as artifacts of the public code repository.
 
 ## Private manual workflow
 
-See [private-runner.yml](private-runner.yml) for the workflow installed in the
-private parking-reports repository as .github/workflows/prepare.yml. It uses only
+See [private-runner.yml](private-runner.yml) for a private draft-preparation
+workflow template. A deployment may install it as .github/workflows/prepare.yml.
+The template uses only
 workflow_dispatch, read-only permissions and a pinned helper commit. The reports
 are mounted read-only at runtime and excluded from the Docker build context.
 The container has no network access and only prepares drafts. Output and diagnostics
 are retained as a private artifact for 7 days. No form filling or submission runs.
 
-The runner is gated by REVIEWED_HELPER=false until helper PR #8 is reviewed. After
-review, pin the approved helper revision and set the gate to true in the private
-repository. No merge or real-data run is part of this change.
+The checked-in template is gated by REVIEWED_HELPER=false and carries a fixed
+helper revision. Before using it, review and pin the intended helper revision,
+then enable the gate in the private deployment through a reviewed change. The
+template does not establish the status or approval of any installed workflow.
 
 No Google credential, Drive token, PAT or external key is needed for this path.
 The optional legacy --drive-folder client is unused by this workflow.

@@ -6,7 +6,7 @@ requests, changes no files, verifies no case mappings and sends nothing.
 
 ```sh
 umask 077
-python -m parking_report.monthly /private/parking-reports/ledger/reports.csv \
+python -m parking_report.monthly /private/ledger/reports.csv \
   --month 2026-10 > /private/monthly-2026-10.md
 ```
 
