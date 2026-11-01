@@ -17,9 +17,8 @@ text is Hebrew; code and documentation are English.
 
 This repository is the **engine**. It holds code, a captured municipal subject
 catalog and synthetic tests only. Real photos, plates, reporter identity,
-registry snapshots and credentials live in a separate private repository,
-`parking-reports`, which runs reviewed versions of this code. Nothing private
-belongs here.
+registry snapshots and credentials live in a separate private data repository
+that runs reviewed versions of this code. Nothing private belongs here.
 
 ## How the system works
 
@@ -27,9 +26,8 @@ belongs here.
 flowchart LR
     P["Photo from the owner"] --> R["Registry lookup (data.gov.il)"]
     R --> T["Report text and review"]
-    T --> A["Private GitHub Actions"]
-    A --> V["VPN tunnel (owner's gateway)"]
-    V --> M["Municipal 106 API"]
+    T --> A["Approved private runner"]
+    A --> M["Municipal 106 API"]
     M --> L["Private ledger and monthly draft"]
     P -. "plate redaction, human check" .-> S["Social posts: X, Facebook"]
 ```
@@ -52,14 +50,16 @@ flowchart LR
    coordinates; the owner reviews the exact text before filing. Public posts carry
    only the tag status, plus licence or test status when it is missing or expired.
    Raw registry snapshots are never published.
-5. **Filing through the 106 API.** The private repository runs this code in GitHub
-   Actions: login, contact registration, case creation, photo upload. GitHub-hosted
-   runners are blocked by the municipal login (HTTP 403), so the job first opens an
-   L2TP/IPsec tunnel through the owner's own gateway. Only tunnel bring-up is
-   retried (after 1 minute, then 5 minutes). **No municipal request is ever
-   retried**, so a timeout cannot create a duplicate case. Each live attempt is
-   approved per report: the exact text, photo, address and subject are reviewed,
-   bound to a digest and consumed once. See [docs/API106.md](docs/API106.md).
+5. **Filing through the 106 API.** A private deployment runs this code for login,
+   contact registration, case creation and photo upload. Runner location and
+   network transport are deployment-specific; GitHub Actions with a VPN is one
+   supported deployment, not an engine requirement. The engine enforces private
+   live enablement, the exact approved digest and a durable single-use ledger;
+   the caller's workflow adds review and approval gates around those checks.
+   **No municipal request is ever retried**, so a
+   timeout cannot create a duplicate case. Each live attempt is approved per
+   report: the exact text, photo, address and subject are reviewed, bound to a
+   digest and consumed once. See [docs/API106.md](docs/API106.md).
 6. **Duplicate protection.** A private durable ledger records stable report IDs and
    original-photo SHA-256 hashes, with a checkpoint before every side effect. A
    repeated photo or changed inputs for a reserved ID stop for review, and one run
@@ -79,9 +79,8 @@ flowchart LR
    check is required. X posts are made by the Instinct assistant. Facebook
    publishing is disabled until a Page access token is set up.
 
-For the full diagram and responsibilities of both repositories, see
-`docs/ARCHITECTURE.md` in the private `parking-reports` repository (collaborators
-only).
+Deployment-specific diagrams and private operational instructions belong in
+the private caller repository, not in this public engine README.
 
 Explicitly approved follow-ups can reuse original evidence only through the
 [parent-linked follow-up gate](docs/AUTHORIZED-FOLLOWUPS.md), never by changing
@@ -92,8 +91,8 @@ photo bytes or deleting duplicate history.
 - Never auto-submits, never touches a CAPTCHA, never retries a municipal write.
 - No real plates, names, ID numbers, locations, photos or keys in this repository,
   its Actions logs or its artifacts. Tests use synthetic data.
-- Private Actions pin this code at a reviewed full commit SHA, so a change here
-  does not reach filing until the pin is updated in a reviewed change.
+- Private deployments must pin this code at a reviewed full commit SHA; a change
+  here is not approval to update a deployment or file a report.
 - A flag in a record is an audit trail, not consent.
 
 ## Repository security
@@ -102,10 +101,8 @@ photo bytes or deleting duplicate history.
   required checks green (tests plus security scans).
 - CodeQL, dependency review, Dependabot and an OpenSSF Scorecard workflow run in
   CI; workflow Actions are pinned to commit SHAs.
-- The private `parking-reports` repository is limited by its GitHub plan: some
-  protections there (for example CodeQL and dependency review on a private
-  repository) may need a paid plan. Their status is tracked in that repository's
-  issues, so it is not restated here. Code scanning runs on this public repository.
+- Protection and billing limits in a private caller repository are tracked there.
+  Code scanning runs on this public repository.
 - Report vulnerabilities privately; see [SECURITY.md](SECURITY.md).
 
 ## Requirements
@@ -254,8 +251,8 @@ it is report-only until the repository variable `RUFF_GATE=on`. See
 ## Render HTTP connectivity check (diagnostic)
 
 `Dockerfile.render` builds a small authenticated Login-check service that was used
-to test hosting options. It is not the filing route: production filing goes through
-GitHub Actions and the VPN tunnel described above. See
+to test hosting options. It is not the filing route; deployment-specific runner and
+transport instructions belong in the private caller repository. See
 [docs/HTTP106.md](docs/HTTP106.md), the OpenAPI contract in
 [docs/openapi.json](docs/openapi.json) and the scope decision in
 [docs/HTTP-SCOPE.md](docs/HTTP-SCOPE.md).
