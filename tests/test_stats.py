@@ -125,6 +125,13 @@ class SummarizeTest(unittest.TestCase):
         self.assertEqual(sum(by_week.values()), 12)
         self.assertEqual(next(iter(self.summary["hotspots"])), "רחוב הדוגמה 1")
 
+    def test_streetless_incidents_are_not_hotspots(self):
+        # Fixture: one incident has streetname null; it must not appear as a spot.
+        self.assertNotIn("(ללא רחוב)", self.summary["hotspots"])
+        self.assertFalse(
+            any(spot.startswith(NO_STREET) for spot in self.summary["hotspots"])
+        )
+
     def test_hotspots_below_the_minimum_count_floor_are_dropped(self):
         # Fixture: "רחוב הסינתטי 1" appears twice - under the default floor of 3.
         self.assertNotIn("רחוב הסינתטי 1", self.summary["hotspots"])

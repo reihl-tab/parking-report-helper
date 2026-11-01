@@ -160,7 +160,10 @@ def _category_aggregates(
 def _hotspots(incidents: list[dict], limit: int, min_count: int) -> dict[str, int]:
     spots: dict[str, int] = {}
     for incident in incidents:
-        street = _text(incident, "streetname", NO_STREET)
+        street = incident.get("streetname")
+        if not (isinstance(street, str) and street.strip()):
+            continue  # streetless incidents are by_street's "(ללא רחוב)", not hotspots
+        street = street.strip()
         number = incident.get("housenumber")
         number = str(number).strip() if number not in (None, "") else ""
         spot = f"{street} {number}".strip()
