@@ -4,9 +4,17 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  schedule:
+    # Weekly full suite: Sunday 06:00 Israel winter time (04:00 UTC;
+    # runs 07:00 IDT in summer).
+    - cron: '0 4 * * 0'
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   unittest:
@@ -22,6 +30,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install package
         run: python -m pip install ".[api]"
       - name: Run unit and CLI tests
@@ -40,6 +50,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install package
         run: python -m pip install ".[api]" coverage
       - name: Measure coverage
@@ -78,6 +90,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install package
         run: python -m pip install ".[api]" "mypy>=1.13,<2"
       - name: mypy (blocking when repo variable MYPY_GATE=on)
@@ -103,6 +117,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install ruff (pinned)
         run: python -m pip install "ruff==0.16.9"
       - name: ruff check and format check (blocking when repo variable RUFF_GATE=on)
@@ -165,6 +181,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install package and freeze the resolved environment
         run: |
           python -m pip install ".[api]"
