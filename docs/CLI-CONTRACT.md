@@ -74,6 +74,39 @@ version is `0.4.0`. Changes to this contract follow the
 - **`parking-report-106`** prints exactly one JSON line for every outcome *after argument parsing succeeds*: `dry_run` or `submit` (exit 0), the fixed `blocked` line (exit 4), or a successful submit whose post-submit duplicate check found a second municipal case with the identical text (exit 5, with `duplicate_check: "duplicates_found"` and the case numbers in `duplicate_case_numbers`; every submit line carries `duplicate_check` and `duplicate_case_numbers`: a fresh submission prints `"single"`, `"pending"` (the new case is not visible in the municipal listing yet), or `"unavailable"` when the check itself failed, none of which change the exit code, and any other submit result prints `"skipped"` with an empty list). Every `Exception` after parsing becomes that `blocked` line (a `BaseException` such as `KeyboardInterrupt` or `SystemExit` still propagates), and no exception text reaches the log. Before that point argparse owns the output: `--help` prints help text and exits 0, and a usage error prints usage text to stderr and exits 2. Neither is JSON. A live submission additionally needs `PARKING_106_ENABLE_LIVE=true`, the exact `--approved-sha256` and `--ledger-dir`; otherwise it ends `blocked`.
 - **`parking-report-http`** reads only `-h`/`--help` from the command line (#188): either one, anywhere in the arguments, prints help on stdout and exits 0 before any configuration is read or a socket is bound. Every other argument is still **ignored, not rejected**. Rejecting them would be a behaviour change for a separate PR. A missing or short `PARKING_HTTP_TOKEN` or an invalid `PORT` exits 1 with the fixed message in `config_error_message`. Otherwise it serves until it's stopped.
 
+## Man pages (#188)
+
+The three console commands in `pyproject.toml` `[project.scripts]` are the
+**shipped** commands and each has a page in `man/man1/`:
+`parking-report.1`, `parking-report-106.1` and `parking-report-http.1`.
+Everything under `scripts/` is **internal** tooling and has no page.
+
+The pages are generated, not hand-edited. `scripts/gen_manpages.py` reads the
+JSON block above (flags, defaults, choices, exit codes) and each command's own
+argparse definitions in-process (description, option help), without running
+the command, reading configuration, binding a socket or using the network.
+`tests/test_manpages_188.py` fails when a committed page differs from the
+generator's output.
+
+```sh
+python scripts/gen_manpages.py            # regenerate man/man1/*.1
+python scripts/gen_manpages.py --check    # exit 1 on drift
+python scripts/install_manpages.py        # $DESTDIR$PREFIX/share/man/man1
+PREFIX=$HOME/.local python scripts/install_manpages.py
+DESTDIR=/tmp/stage PREFIX=/usr python scripts/install_manpages.py
+```
+
+`PREFIX` defaults to `/usr/local` and must be absolute; `DESTDIR` is empty by
+default. `--prefix`/`--destdir` override them. The installer copies only the
+shipped pages, needs no network and never calls `sudo`. Both scripts are
+quiet by default; `--debug` or `PARKING_MANPAGES_DEBUG=1` prints stage names
+to stderr. Logs never contain arguments, paths, environment values or
+configuration, and a failure prints only the stage and the error class.
+
+After changing a flag, help text or exit code, update the JSON block and run
+the generator in the same PR. The page date (`PAGE_DATE` in the generator) is
+fixed so output is reproducible; bump it with the package version.
+
 ## Known gaps (measured, not fixed here)
 
 1. `--json` isn't available everywhere. `parking-report` has it only with `--municipality`; plain report text has no JSON mode.
