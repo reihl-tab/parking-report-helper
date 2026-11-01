@@ -4,6 +4,7 @@ Temporary directories only: every victim file and every "outside" directory
 lives inside the test's own temp dir. No real PREFIX, no sudo, no network.
 """
 
+import importlib.util
 import os
 import stat
 import subprocess
@@ -40,7 +41,28 @@ def tree(top):
     return found
 
 
+def source_pages(tmp):
+    """The committed pages; the Docker test image has no man/, so there the
+    pages are generated into tmp (the drift test proves they are equal)."""
+    if MAN1.is_dir():
+        return MAN1
+    spec = importlib.util.spec_from_file_location(
+        "gen_manpages", ROOT / "scripts" / "gen_manpages.py"
+    )
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    out = Path(tmp) / "pages"
+    gen.write_pages(gen.generate(gen.Log(False)), out, gen.Log(False))
+    return out
+
+
 class InstallerPathSafety207(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(tmp.cleanup)
+        cls.source = source_pages(tmp.name)
+
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -66,7 +88,7 @@ class InstallerPathSafety207(unittest.TestCase):
             "DESTDIR": str(self.stage) if destdir is None else destdir,
         }
         return subprocess.run(
-            [sys.executable, str(SCRIPT), "--source", str(MAN1)],
+            [sys.executable, str(SCRIPT), "--source", str(self.source)],
             capture_output=True,
             text=True,
             env=env,
@@ -126,7 +148,7 @@ class InstallerPathSafety207(unittest.TestCase):
         self.assert_victim_unchanged()
         self.assertEqual(
             (man1 / "parking-report.1").read_bytes(),
-            (MAN1 / "parking-report.1").read_bytes(),
+            (self.source / "parking-report.1").read_bytes(),
         )
 
     # (c) symlinked parent directory --------------------------------------
@@ -179,7 +201,9 @@ class InstallerPathSafety207(unittest.TestCase):
                     path = man1 / page
                     self.assertFalse(path.is_symlink())
                     self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o644)
-                    self.assertEqual(path.read_bytes(), (MAN1 / page).read_bytes())
+                    self.assertEqual(
+                        path.read_bytes(), (self.source / page).read_bytes()
+                    )
                 (man1 / PAGES[0]).write_bytes(b"stale")
                 (man1 / PAGES[0]).chmod(0o600)
         self.assert_victim_unchanged()
