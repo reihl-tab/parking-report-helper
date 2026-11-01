@@ -194,6 +194,9 @@ def main() -> int:
         result = lookup(record["plate"], date.today())
         args.output.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        # os.open's mode applies only at creation; a pre-existing 0644
+        # output file keeps its mode without this (#239).
+        os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
             json.dump(result, stream, ensure_ascii=False, indent=2)
         print("Registry check saved privately; review unknown results before use.")

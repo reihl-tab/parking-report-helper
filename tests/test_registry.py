@@ -1,8 +1,16 @@
+import json
+import os
+import stat
+import sys
+import tempfile
 import unittest
 from datetime import date
+from pathlib import Path
 from typing import ClassVar
+from unittest import mock
 
 from parking_report.registry import VEHICLES, describe_he, lookup
+from parking_report.registry import main as registry_main
 from parking_report.report import build_report
 
 
@@ -38,6 +46,27 @@ class RegistryTests(unittest.TestCase):
     def test_invalid_plate(self):
         with self.assertRaises(ValueError):
             lookup("abc", date(2026, 10, 8))
+
+    def test_main_rechmod_preexisting_output_0600(self):
+        # os.open's mode applies only at creation: a pre-existing 0644
+        # output file must still end 0600 (#239).
+        with tempfile.TemporaryDirectory() as tmp:
+            record = Path(tmp) / "record.json"
+            record.write_text(json.dumps({"plate": "1234567"}), encoding="utf-8")
+            output = Path(tmp) / "out.json"
+            output.write_text("{}", encoding="utf-8")
+            os.chmod(output, 0o644)
+            argv = ["parking-registry", str(record), "--output", str(output)]
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch(
+                    "parking_report.registry.lookup",
+                    return_value={"licence_status": "unknown"},
+                ),
+            ):
+                self.assertEqual(registry_main(), 0)
+            mode = stat.S_IMODE(os.stat(output).st_mode)
+            self.assertEqual(mode, 0o600, oct(mode))
 
 
 class DescribeTests(unittest.TestCase):
