@@ -44,7 +44,11 @@ class TestRowInMonth(unittest.TestCase):
             (row(street=None), "^Invalid ledger value$"),
             (row(filed_date="2026-5-03", street=None), "^Invalid ledger value$"),
             (row(filed_date="03/05/2026"), "^Invalid filing date$"),
-            (row(filed_date="2026-02-30"), "day is out of range"),
+            (
+                row(filed_date="2026-02-30"),
+                # 3.15 reworded the stdlib day-range error (gh-70647); accept both.
+                r"day (is out of range for month|30 must be in range 1\.\.28 for month 2)",
+            ),
         ]
         for bad, message in cases:
             with self.assertRaisesRegex(ValueError, message):

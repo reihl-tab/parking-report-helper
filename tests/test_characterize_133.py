@@ -230,7 +230,12 @@ class TestMonthlyDraftValidation(unittest.TestCase):
                 self.assertRejects("Invalid month", [], month)
 
     def test_month_out_of_range(self):
-        self.assertRejects("month must be in 1..12", [], "2026-13")
+        # 3.15 appends ", not 13" to the stdlib month-range error; accept both,
+        # anchored so the repo's own messages stay exactly pinned elsewhere.
+        with self.assertRaisesRegex(
+            ValueError, r"^month must be in 1\.\.12(, not \d+)?$"
+        ):
+            monthly_draft([], "2026-13")
 
     def test_month_checked_before_rows(self):
         self.assertRejects("Invalid month", [{"bad": "row"}], "2026-1")
@@ -247,9 +252,13 @@ class TestMonthlyDraftValidation(unittest.TestCase):
         self.assertRejects("Invalid filing date", [row(filed_date="2026-10-5")])
 
     def test_filing_date_impossible(self):
-        self.assertRejects(
-            "day is out of range for month", [row(filed_date="2026-02-30")], "2026-02"
-        )
+        # 3.15 reworded the stdlib day-range error (gh-70647); accept both,
+        # anchored so the repo's own messages stay exactly pinned elsewhere.
+        with self.assertRaisesRegex(
+            ValueError,
+            r"^day (is out of range for month|30 must be in range 1\.\.28 for month 2)( in year \d{4})?$",
+        ):
+            monthly_draft([row(filed_date="2026-02-30")], "2026-02")
 
     def test_other_month_rows_still_need_columns_and_dates(self):
         self.assertRejects(
