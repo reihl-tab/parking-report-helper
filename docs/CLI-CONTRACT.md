@@ -86,7 +86,10 @@ JSON block above (flags, defaults, choices, exit codes) and each command's own
 argparse definitions in-process (description, option help), without running
 the command, reading configuration, binding a socket or using the network.
 `tests/test_manpages_188.py` fails when a committed page differs from the
-generator's output.
+generator's output. Generation and `--check` import the package and all three
+command modules, so they need the existing `api` extra installed
+(`pip install ".[api]"`, as for the tests); the installer itself only copies
+files.
 
 ```sh
 python scripts/gen_manpages.py            # regenerate man/man1/*.1
@@ -102,6 +105,23 @@ shipped pages, needs no network and never calls `sudo`. Both scripts are
 quiet by default; `--debug` or `PARKING_MANPAGES_DEBUG=1` prints stage names
 to stderr. Logs never contain arguments, paths, environment values or
 configuration, and a failure prints only the stage and the error class.
+
+Path safety (#207). `PREFIX` must not contain a `..` component, so
+`$DESTDIR$PREFIX` cannot climb out of the staging directory (exit 1,
+`stage=destination error=ValueError`). The trusted root is `DESTDIR` when it
+is set, otherwise `PREFIX`: it and its parents are used as they are (they may
+be symlinks). Every directory below it, and every existing page, must be a
+real directory or regular file; a symlink there is refused (exit 1,
+`stage=copy error=UnsafePathError`) before any page is written. Pages are
+written to a new temporary file in `man1` and swapped in with `os.replace`,
+so an existing link or hard-linked file is never written through or
+`chmod`-ed. The installer is not safe against a concurrent attacker: run it
+only on directories nobody else can write to while it runs.
+
+Type checks: the configured `mypy` run covers `src` only. The two scripts
+check clean when run explicitly with the source tree on the path,
+`MYPYPATH=src mypy scripts/gen_manpages.py scripts/install_manpages.py`
+(also with `--strict`); CI does not run that.
 
 After changing a flag, help text or exit code, update the JSON block and run
 the generator in the same PR. The page date (`PAGE_DATE` in the generator) is
