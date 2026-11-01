@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -111,9 +112,10 @@ def _count(items: Iterable[str]) -> dict[str, int]:
 
 
 def _quantile(sorted_values: list[float], fraction: float) -> float:
+    """Nearest-rank: value at index ceil(fraction * n) - 1."""
     if not sorted_values:
         return 0.0
-    index = min(len(sorted_values) - 1, int(fraction * len(sorted_values)))
+    index = max(0, math.ceil(fraction * len(sorted_values)) - 1)
     return sorted_values[index]
 
 
@@ -151,7 +153,39 @@ def _category_aggregates(
     return ordered, closures
 
 
-def summarize(incidents: list[dict], *, top_streets: int = 20) -> dict:
+def _hotspots(incidents: list[dict], limit: int) -> dict[str, int]:
+    spots: dict[str, int] = {}
+    for incident in incidents:
+        street = _text(incident, "streetname", NO_STREET)
+        number = incident.get("housenumber")
+        number = str(number).strip() if number not in (None, "") else ""
+        spot = f"{street} {number}".strip()
+        spots[spot] = spots.get(spot, 0) + 1
+    ordered = sorted(spots.items(), key=lambda kv: (-kv[1], kv[0]))
+    return dict(ordered[:limit])
+
+
+def _by_neighborhood(
+    incidents: list[dict], neighborhoods: dict[str, str] | None
+) -> dict[str, int] | None:
+    if neighborhoods is None:
+        return None
+    counts: dict[str, int] = {}
+    for incident in incidents:
+        street = _text(incident, "streetname", NO_STREET)
+        area = neighborhoods.get(street, "(אחר)")
+        counts[area] = counts.get(area, 0) + 1
+    return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def summarize(
+    incidents: list[dict],
+    *,
+    top_streets: int = 20,
+    top_hotspots: int = 10,
+    weeks: int = 12,
+    neighborhoods: dict[str, str] | None = None,
+) -> dict:
     """Aggregate incidents into the summary document consumed by the CLI."""
     created_dates = [
         parsed
@@ -159,6 +193,10 @@ def summarize(incidents: list[dict], *, top_streets: int = 20) -> dict:
         if parsed is not None
     ]
     months = [f"{d.year:04d}-{d.month:02d}" for d in created_dates]
+    iso_weeks = [
+        f"{iso.year:04d}-W{iso.week:02d}"
+        for iso in (d.isocalendar() for d in created_dates)
+    ]
 
     durations = [
         days for days in (closure_days(i) for i in incidents) if days is not None
@@ -175,6 +213,9 @@ def summarize(incidents: list[dict], *, top_streets: int = 20) -> dict:
             "last": max(created_dates).date().isoformat() if created_dates else None,
         },
         "by_month": dict(sorted(_count(months).items())),
+        "by_week": dict(list(sorted(_count(iso_weeks).items()))[-weeks:]),
+        "hotspots": _hotspots(incidents, top_hotspots),
+        "by_neighborhood": _by_neighborhood(incidents, neighborhoods),
         "by_category": by_category,
         "by_street": dict(
             list(_count(_text(i, "streetname", NO_STREET) for i in incidents).items())[
@@ -193,7 +234,7 @@ def summarize(incidents: list[dict], *, top_streets: int = 20) -> dict:
                 category: round(_quantile(sorted(values), 0.5), 3)
                 for category, values in sorted(
                     closure_by_category.items(),
-                    key=lambda kv: -len(kv[1]),
+                    key=lambda kv: (-len(kv[1]), kv[0]),
                 )
             },
         },

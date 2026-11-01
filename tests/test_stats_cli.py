@@ -31,7 +31,8 @@ class BuildCommandTest(unittest.TestCase):
             self.assertEqual(summary["total_incidents"], 13)
             self.assertEqual(summary["duplicates_skipped"], 1)
             self.assertEqual(summary["schema_version"], 1)
-            for name in ("monthly.csv", "categories.csv", "streets.csv"):
+            self.assertEqual(summary["inputs"], ["export_a.json", "export_b.json"])
+            for name in ("monthly.csv", "categories.csv", "streets.csv", "report.html"):
                 self.assertTrue((out / name).exists(), name)
             with (out / "monthly.csv").open(encoding="utf-8") as handle:
                 rows = list(csv.reader(handle))
@@ -60,8 +61,6 @@ class BuildCommandTest(unittest.TestCase):
             self.assertEqual(code, 2)
 
 
-if __name__ == "__main__":
-    unittest.main()
 class PrivacyTest(unittest.TestCase):
     """Private source fields (plates, names in `description`) never leak (#210)."""
 
@@ -76,8 +75,29 @@ class PrivacyTest(unittest.TestCase):
             code = run(["build", str(FIXTURES / "export_private.json"), "-o", str(out)])
             self.assertEqual(code, 0)
             outputs = sorted(p.name for p in out.iterdir() if p.is_file())
-            self.assertEqual(outputs, ["categories.csv", "monthly.csv", "streets.csv", "summary.json"])
+            self.assertEqual(
+                outputs,
+                [
+                    "categories.csv",
+                    "monthly.csv",
+                    "report.html",
+                    "streets.csv",
+                    "summary.json",
+                ],
+            )
             for path in out.iterdir():
                 text = path.read_text(encoding="utf-8")
-                for secret in (self.PLATE, self.PLATE_2, self.NAME, self.NAME_2, "description"):
-                    self.assertNotIn(secret, text, f"{secret!r} leaked into {path.name}")
+                for secret in (
+                    self.PLATE,
+                    self.PLATE_2,
+                    self.NAME,
+                    self.NAME_2,
+                    "description",
+                ):
+                    self.assertNotIn(
+                        secret, text, f"{secret!r} leaked into {path.name}"
+                    )
+
+
+if __name__ == "__main__":
+    unittest.main()

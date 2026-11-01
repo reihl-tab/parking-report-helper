@@ -76,7 +76,7 @@ version is `0.4.0`. Changes to this contract follow the
           }
         }
       },
-      "exit_codes": {"0": "summary.json and the CSV tables written to the output directory; one summary line on stdout", "1": "input error (missing, unreadable or invalid export file), `p106-stats: ...` on stderr", "2": "usage error (argparse, or an invalid value such as --top-streets 0), message on stderr"}
+      "exit_codes": {"0": "summary.json, the CSV tables and report.html written to the output directory; one summary line on stdout", "1": "input error (missing, unreadable or invalid export file), `p106-stats: ...` on stderr", "2": "usage error (argparse, or an invalid value such as --top-streets 0), message on stderr"}
     }
   }
 }
@@ -89,7 +89,7 @@ version is `0.4.0`. Changes to this contract follow the
 - **`parking-report-106`** prints exactly one JSON line for every outcome *after argument parsing succeeds*: `dry_run` or `submit` (exit 0), the fixed `blocked` line (exit 4), or a successful submit whose post-submit duplicate check found a second municipal case with the identical text (exit 5, with `duplicate_check: "duplicates_found"` and the case numbers in `duplicate_case_numbers`; every submit line carries `duplicate_check` and `duplicate_case_numbers`: a fresh submission prints `"single"`, `"pending"` (the new case is not visible in the municipal listing yet), or `"unavailable"` when the check itself failed, none of which change the exit code, and any other submit result prints `"skipped"` with an empty list). Every `Exception` after parsing becomes that `blocked` line (a `BaseException` such as `KeyboardInterrupt` or `SystemExit` still propagates), and no exception text reaches the log. Before that point argparse owns the output: `--help` prints help text and exits 0, and a usage error prints usage text to stderr and exits 2. Neither is JSON. A live submission additionally needs `PARKING_106_ENABLE_LIVE=true`, the exact `--approved-sha256` and `--ledger-dir`; otherwise it ends `blocked`.
 - **`parking-report-http`** reads only `-h`/`--help` from the command line (#188): either one, anywhere in the arguments, prints help on stdout and exits 0 before any configuration is read or a socket is bound. Every other argument is still **ignored, not rejected**. Rejecting them would be a behaviour change for a separate PR. A missing or short `PARKING_HTTP_TOKEN` or an invalid `PORT` exits 1 with the fixed message in `config_error_message`. Otherwise it serves until it's stopped.
 
-- **`p106-stats`** is fully offline: `build` reads one or more `reports_raw.json` exports and writes `summary.json` and the CSV tables into `--output`. A missing or invalid export exits 1; `--top-streets` must be positive (exit 2 otherwise).
+- **`p106-stats`** is fully offline: `build` reads one or more `reports_raw.json` exports and writes `summary.json`, the CSV tables and `report.html` into `--output`. A missing or invalid export exits 1; `--top-streets` must be positive (exit 2 otherwise).
 
 ## Man pages (#188)
 

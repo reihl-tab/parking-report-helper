@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from .stats import StatsError, load_incidents, summarize
+from .stats_html import build_report
 
 PROG = "p106-stats"
 
@@ -64,7 +65,7 @@ def run(argv: list[str]) -> int:
         print(f"{PROG}: {exc}", file=sys.stderr)
         return 1
     summary = summarize(incidents, top_streets=args.top_streets)
-    summary["inputs"] = [str(Path(p)) for p in args.inputs]
+    summary["inputs"] = [Path(p).name for p in args.inputs]
     summary["duplicates_skipped"] = duplicates
 
     out_dir = Path(args.output)
@@ -83,6 +84,7 @@ def run(argv: list[str]) -> int:
     _write_csv(
         out_dir / "streets.csv", ("street", "reports"), summary["by_street"].items()
     )
+    (out_dir / "report.html").write_text(build_report(summary), encoding="utf-8")
     print(
         f"{PROG}: {summary['total_incidents']} incidents "
         f"({duplicates} duplicates skipped) -> {out_dir}"

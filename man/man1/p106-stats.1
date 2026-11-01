@@ -16,8 +16,8 @@ Fully offline: files are read locally, outputs are written locally,
 nothing is uploaded.
 .PP
 The build subcommand takes one or more export JSON files and writes
-summary.json and the monthly/categories/streets CSVs into \-\-output.
-Fully offline: no network, no credentials.
+summary.json, the monthly/categories/streets CSVs and report.html into
+\-\-output. Fully offline: no network, no credentials.
 .SH OPTIONS
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -26,11 +26,24 @@ Show this help message and exit.
 .TP
 \fIcommand\fR
 
+.SS "build options"
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show this help message and exit.
+.TP
+\fB\-\-output\fR, \fB\-o\fR \fIOUTPUT\fR
+Output directory for summary.json and the CSV tables. Required.
+.TP
+\fB\-\-top\-streets\fR \fITOP_STREETS\fR
+How many streets to keep in by_street (default: 20) Default: 20.
+.TP
+\fIinputs\fR
+Reports_raw.json export file(s)
 .SH EXIT STATUS
 .TP
 .B 0
-Summary.json and the CSV tables written to the output directory; one
-summary line on stdout.
+Summary.json, the CSV tables and report.html written to the output
+directory; one summary line on stdout.
 .TP
 .B 1
 Input error (missing, unreadable or invalid export file), `p106\-stats:

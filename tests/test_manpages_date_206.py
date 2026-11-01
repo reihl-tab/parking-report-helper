@@ -25,7 +25,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "gen_manpages.py"
 MAN1 = ROOT / "man" / "man1"
-SHIPPED = ("p106-stats.1", "parking-report.1", "parking-report-106.1", "parking-report-http.1")
+SHIPPED = (
+    "p106-stats.1",
+    "parking-report.1",
+    "parking-report-106.1",
+    "parking-report-http.1",
+)
 OTHER_DATE = "1999-12-31"
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 

@@ -110,8 +110,8 @@ ENVIRONMENT: dict[str, list[tuple[str, str]]] = {
 # argparse definitions.
 USAGE_NOTES: dict[str, str] = {
     "p106-stats": "The build subcommand takes one or more export JSON files "
-    "and writes summary.json and the monthly/categories/streets CSVs "
-    "into --output. Fully offline: no network, no credentials.",
+    "and writes summary.json, the monthly/categories/streets CSVs and "
+    "report.html into --output. Fully offline: no network, no credentials.",
     "parking-report": "Give exactly one of a cars JSON file (input) or --intake "
     "DIR. --drive-folder requires --intake; --reporter and --json require "
     "--municipality.",
@@ -413,6 +413,36 @@ def render_page(
             label = esc(str(action.metavar or action.dest))
             text = _help(action) or notes.get(str(action.dest), "")
             lines += [".TP", f"\\fI{label}\\fR", para(_sentence(text))]
+    subparsers = [
+        a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
+    ]
+    for sub_action in subparsers:
+        for sub_name, sub_parser in sub_action.choices.items():
+            lines.append(f'.SS "{esc(sub_name)} options"')
+            for action in _visible(sub_parser):
+                if not action.option_strings:
+                    continue
+                text = _sentence(_help(action))
+                spec_opt = (
+                    spec.get("subcommands", {})
+                    .get(sub_name, {})
+                    .get("options", {})
+                    .get(
+                        next(
+                            (o for o in action.option_strings if o.startswith("--")),
+                            action.option_strings[0],
+                        ),
+                        {},
+                    )
+                )
+                extra = _default_note(spec_opt, text)
+                body = " ".join(x for x in (text, extra) if x)
+                lines += [".TP", _option_label(action), para(body)]
+            sub_positionals = [a for a in _visible(sub_parser) if not a.option_strings]
+            for action in sub_positionals:
+                label = esc(str(action.metavar or action.dest))
+                text = _sentence(_help(action))
+                lines += [".TP", f"\\fI{label}\\fR", para(text)]
     if env_lines:
         lines.append(".SH ENVIRONMENT")
         for env_names, text in env_lines:

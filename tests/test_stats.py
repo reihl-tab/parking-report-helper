@@ -8,6 +8,7 @@ from pathlib import Path
 from parking_report.stats import (
     NO_STREET,
     StatsError,
+    _quantile,
     closure_days,
     load_incidents,
     parse_datetime,
@@ -118,9 +119,62 @@ class SummarizeTest(unittest.TestCase):
         self.assertIsNone(summary["date_range"]["first"])
         self.assertEqual(summary["closure"]["closed_count"], 0)
 
+    def test_by_week_trailing_and_hotspots(self):
+        by_week = self.summary["by_week"]
+        self.assertTrue(all(key.startswith("2026-W") for key in by_week))
+        self.assertEqual(sum(by_week.values()), 12)
+        self.assertEqual(next(iter(self.summary["hotspots"])), "רחוב הדוגמה 1")
+        self.assertIsNone(self.summary["by_neighborhood"])
+
+    def test_neighborhood_mapping(self):
+        mapping = {"רחוב הדוגמה": "שכונת הדוגמה", "שדרות הבדיקה": "שכונת הבדיקה"}
+        summary = summarize(self.incidents, neighborhoods=mapping)
+        areas = summary["by_neighborhood"]
+        self.assertEqual(areas["שכונת הדוגמה"], 6)
+        self.assertEqual(areas["(אחר)"], 4)
+
     def test_top_streets_limit(self):
         summary = summarize(self.incidents, top_streets=2)
         self.assertEqual(len(summary["by_street"]), 2)
+
+
+class QuantileTest(unittest.TestCase):
+    def test_nearest_rank(self):
+        values = [1.0, 2.0, 3.0, 4.0]
+        self.assertEqual(_quantile(values, 0.5), 2.0)
+        self.assertEqual(_quantile(values, 0.25), 1.0)
+        self.assertEqual(_quantile(values, 0.75), 3.0)
+        self.assertEqual(_quantile([1.0, 2.0, 3.0], 0.5), 2.0)
+        self.assertEqual(_quantile([], 0.5), 0.0)
+        self.assertEqual(_quantile([5.0], 0.75), 5.0)
+
+    def test_summary_median_p25_p75(self):
+        incidents = [
+            {
+                "createdon": f"2026-06-0{day}T08:00:00",
+                "ClosedDateIncident": f"2026-06-0{day + days}T08:00:00",
+                "subjectname": "קטגוריה",
+                "statusname": "סיום טיפול",
+            }
+            for day, days in enumerate((1, 2, 3, 4), start=1)
+        ]
+        closure = summarize(incidents)["closure"]
+        self.assertEqual(closure["median_days"], 2.0)
+        self.assertEqual(closure["p25_days"], 1.0)
+        self.assertEqual(closure["p75_days"], 3.0)
+
+    def test_median_days_by_category_ties_sort_by_name(self):
+        incidents = [
+            {
+                "createdon": "2026-06-01T08:00:00",
+                "ClosedDateIncident": "2026-06-02T08:00:00",
+                "subjectname": category,
+                "statusname": "סיום טיפול",
+            }
+            for category in ("ב קטגוריה", "א קטגוריה")
+        ]
+        medians = summarize(incidents)["closure"]["median_days_by_category"]
+        self.assertEqual(list(medians), ["א קטגוריה", "ב קטגוריה"])
 
 
 class ClosureDaysTest(unittest.TestCase):
