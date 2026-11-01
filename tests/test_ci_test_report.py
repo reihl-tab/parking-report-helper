@@ -3,10 +3,10 @@
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
-import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch

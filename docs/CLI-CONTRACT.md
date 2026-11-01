@@ -75,6 +75,18 @@ version is `0.4.0`. Changes to this contract follow the
             "--top-streets": {"default": 20},
             "--plates-ledger": {"default": null}
           }
+        },
+        "refresh": {
+          "positionals": [],
+          "options": {
+            "--output": {"default": null, "required": true},
+            "--archive": {"default": [], "repeatable": true},
+            "--from": {"default": "2021-01-01"},
+            "--top-streets": {"default": 20},
+            "--plates-ledger": {"default": null},
+            "--save-union": {"default": null}
+          },
+          "environment": ["PARKING_106_SUBSCRIPTION_KEY", "PARKING_106_USERNAME", "PARKING_106_PASSWORD", "PARKING_REPORTER_ID_NUMBER"]
         }
       },
       "exit_codes": {"0": "summary.json, the CSV tables and report.html written to the output directory; one summary line on stdout", "1": "input error (missing, unreadable or invalid export file; or an unreadable --plates-ledger file), `p106-stats: ...` on stderr", "2": "usage error (argparse, or an invalid value such as --top-streets 0), message on stderr"}
@@ -91,6 +103,7 @@ version is `0.4.0`. Changes to this contract follow the
 - **`parking-report-http`** reads only `-h`/`--help` from the command line (#188): either one, anywhere in the arguments, prints help on stdout and exits 0 before any configuration is read or a socket is bound. Every other argument is still **ignored, not rejected**. Rejecting them would be a behaviour change for a separate PR. A missing or short `PARKING_HTTP_TOKEN` or an invalid `PORT` exits 1 with the fixed message in `config_error_message`. Otherwise it serves until it's stopped.
 
 - **`p106-stats`** is fully offline: `build` reads one or more `reports_raw.json` exports and writes `summary.json`, the CSV tables and `report.html` into `--output`. A missing or invalid export exits 1; `--top-streets` must be positive (exit 2 otherwise). With `--plates-ledger CSV` (#220) it additionally aggregates the private filing ledger into `plates.csv` (repeat plates with 3+ distinct identified filed reports: `plate, reports`; only standard 7/8-digit plates, optionally dashed in the standard positions, are publishable and appear in canonical dashed form; reports are deduplicated by union-find over `folder_id`/`municipal_ref`) and sets `repeat_plates_count` in `summary.json`. Rows with a non-standard plate, an invalid or impossible `filed_date`, or no identifier at all are excluded and their count is printed to stderr. The ledger itself is read locally and never copied into the output, and any build that does not emit `plates.csv` removes a stale one. An unreadable, non-UTF-8 or malformed CSV, or one without `plate`/`filed_date` columns, exits 1. Without the flag no `plates.csv` is written and `repeat_plates_count` is 0.
+- **`p106-stats refresh`** (#232, parking-stats #13) is the online counterpart: it fetches the reporter's cases from GetContactCases (`--from` date, default 2021-01-01) using `PARKING_106_SUBSCRIPTION_KEY`, `PARKING_106_USERNAME`, `PARKING_106_PASSWORD` and `PARKING_REPORTER_ID_NUMBER` from the environment (any missing one exits 1 before any network call), unions them with zero or more `--archive` exports by `case_number` - fetched rows win on overlap because they carry the current status, archived rows without a case number are kept as-is, a fetched row without one is an input error (exit 1) - and runs the same build (same outputs, same `--plates-ledger` behaviour, same `--top-streets` rule). `summary.json` lists the archive file names plus `GetContactCases` as inputs. With `--save-union PATH` the merged raw export is written there too; it contains case texts and is private - keep it outside any published repository. The stdout line reports fetched rows, refreshed archived rows and the total.
 
 ## Man pages (#188)
 

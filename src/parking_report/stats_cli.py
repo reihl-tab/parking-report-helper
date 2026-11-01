@@ -2,6 +2,9 @@
 
 `build` writes machine-readable outputs (summary.json + CSVs) and a
 self-contained RTL HTML report (report.html) with pure-SVG charts (#212).
+`refresh` fetches the reporter's current cases from GetContactCases,
+unions them with archived exports by case_number and runs the same build
+(parking-stats #13).
 """
 
 from __future__ import annotations
@@ -9,10 +12,18 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import sys
 from pathlib import Path
 
-from .stats import StatsError, load_incidents, plates_summary, summarize
+from .api106 import APIError, InputError, Municipality
+from .stats import (
+    StatsError,
+    load_incidents,
+    plates_summary,
+    summarize,
+    union_with_fetched,
+)
 from .stats_html import build_report
 
 PROG = "p106-stats"
@@ -49,6 +60,47 @@ def build_parser() -> argparse.ArgumentParser:
         "aggregate (plates.csv with plate,reports for 3+ distinct "
         "filed reports) - the ledger itself never leaves the machine",
     )
+    refresh = sub.add_parser(
+        "refresh",
+        help="fetch current cases from GetContactCases, union with archived "
+        "exports by case_number and rebuild",
+    )
+    refresh.add_argument(
+        "--output",
+        "-o",
+        required=True,
+        help="output directory for summary.json, the CSV tables and report.html",
+    )
+    refresh.add_argument(
+        "--archive",
+        action="append",
+        default=[],
+        help="archived reports_raw.json export (repeatable); fetched rows win "
+        "when a case_number appears in both",
+    )
+    refresh.add_argument(
+        "--from",
+        dest="from_date",
+        default="2021-01-01",
+        help="first case date to fetch, YYYY-MM-DD (default: 2021-01-01)",
+    )
+    refresh.add_argument(
+        "--top-streets",
+        type=int,
+        default=20,
+        help="how many streets to keep in by_street (default: 20)",
+    )
+    refresh.add_argument(
+        "--plates-ledger",
+        default=None,
+        help="optional private filing-ledger CSV (same aggregation as build)",
+    )
+    refresh.add_argument(
+        "--save-union",
+        default=None,
+        help="optional path for the merged raw export (PRIVATE: contains case "
+        "texts; keep outside any published repository)",
+    )
     return parser
 
 
@@ -59,20 +111,56 @@ def _write_csv(path: Path, header: tuple[str, ...], rows) -> None:
         writer.writerows(rows)
 
 
-def run(argv: list[str]) -> int:
-    args = build_parser().parse_args(argv)
-    if args.command != "build":  # pragma: no cover - argparse enforces
-        return 2
-    if args.top_streets < 1:
-        print(f"{PROG}: --top-streets must be positive", file=sys.stderr)
-        return 2
+def _fetch_incidents(
+    credentials: dict, reporter: dict[str, str], from_date: str
+) -> list[dict]:
+    """GET the reporter's cases; returns raw incident dicts. Network + creds."""
+    api = Municipality(credentials)
+    token = api.login()
+    data = api.list_cases(token, reporter, from_date=from_date)
+    incidents = data.get("incidents") or []
+    if not isinstance(incidents, list) or any(
+        not isinstance(row, dict) for row in incidents
+    ):
+        raise StatsError("GetContactCases returned an unexpected shape")
+    return incidents
+
+
+def _refresh(args) -> int:
+    subscription_key = os.environ.get("PARKING_106_SUBSCRIPTION_KEY", "")
+    username = os.environ.get("PARKING_106_USERNAME", "")
+    password = os.environ.get("PARKING_106_PASSWORD", "")
+    id_number = os.environ.get("PARKING_REPORTER_ID_NUMBER", "")
+    if not all((subscription_key, username, password, id_number)):
+        print(
+            f"{PROG}: refresh needs PARKING_106_SUBSCRIPTION_KEY, "
+            "PARKING_106_USERNAME, PARKING_106_PASSWORD and "
+            "PARKING_REPORTER_ID_NUMBER in the environment",
+            file=sys.stderr,
+        )
+        return 1
+    credentials = {
+        "subscription_key": subscription_key,
+        "login": {"UserName": username, "Password": password},
+    }
+    reporter = {"ContactIdNumber": id_number, "ContactIdType": "100000000"}
     try:
-        incidents, duplicates = load_incidents(args.inputs)
-    except StatsError as exc:
+        fetched = _fetch_incidents(credentials, reporter, args.from_date)
+        archived: list[dict] = []
+        duplicates = 0
+        if args.archive:
+            archived, duplicates = load_incidents(args.archive)
+        incidents, overlaps = union_with_fetched(archived, fetched)
+    except (StatsError, InputError, APIError) as exc:
         print(f"{PROG}: {exc}", file=sys.stderr)
         return 1
+    if args.save_union:
+        Path(args.save_union).write_text(
+            json.dumps({"incidents": incidents}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
     summary = summarize(incidents, top_streets=args.top_streets)
-    summary["inputs"] = [Path(p).name for p in args.inputs]
+    summary["inputs"] = [Path(p).name for p in args.archive] + ["GetContactCases"]
     summary["duplicates_skipped"] = duplicates
     plate_rows: list[dict] = []
     if args.plates_ledger:
@@ -88,8 +176,16 @@ def run(argv: list[str]) -> int:
                 file=sys.stderr,
             )
     summary["repeat_plates_count"] = len(plate_rows)
+    _write_outputs(summary, plate_rows, Path(args.output))
+    print(
+        f"{PROG}: refresh: {len(fetched)} fetched "
+        f"({overlaps} refreshed archived rows), "
+        f"{summary['total_incidents']} incidents -> {args.output}"
+    )
+    return 0
 
-    out_dir = Path(args.output)
+
+def _write_outputs(summary: dict, plate_rows: list[dict], out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -117,11 +213,57 @@ def run(argv: list[str]) -> int:
         # (with or without the flag) so it cannot be published by mistake.
         plates_path.unlink()
     (out_dir / "report.html").write_text(build_report(summary), encoding="utf-8")
+
+
+def _plates(args) -> tuple[list[dict], int]:
+    """Shared --plates-ledger handling; returns (rows, exit_code)."""
+    if not args.plates_ledger:
+        return [], 0
+    try:
+        plate_rows, skipped_ids = plates_summary(args.plates_ledger)
+    except (OSError, StatsError) as exc:
+        print(f"{PROG}: --plates-ledger: {exc}", file=sys.stderr)
+        return [], 1
+    if skipped_ids:
+        print(
+            f"{PROG}: --plates-ledger: {skipped_ids} row(s) excluded "
+            "(no identifiers, invalid plate or invalid filed_date)",
+            file=sys.stderr,
+        )
+    return plate_rows, 0
+
+
+def _build(args) -> int:
+    try:
+        incidents, duplicates = load_incidents(args.inputs)
+    except StatsError as exc:
+        print(f"{PROG}: {exc}", file=sys.stderr)
+        return 1
+    summary = summarize(incidents, top_streets=args.top_streets)
+    summary["inputs"] = [Path(p).name for p in args.inputs]
+    summary["duplicates_skipped"] = duplicates
+    plate_rows, code = _plates(args)
+    if code:
+        return code
+    summary["repeat_plates_count"] = len(plate_rows)
+    _write_outputs(summary, plate_rows, Path(args.output))
     print(
         f"{PROG}: {summary['total_incidents']} incidents "
-        f"({duplicates} duplicates skipped) -> {out_dir}"
+        f"({duplicates} duplicates skipped) -> {args.output}"
     )
     return 0
+
+
+def run(argv: list[str]) -> int:
+    args = build_parser().parse_args(argv)
+    if args.top_streets < 1:
+        print(f"{PROG}: --top-streets must be positive", file=sys.stderr)
+        return 2
+    if args.command == "build":
+        return _build(args)
+    if args.command == "refresh":
+        return _refresh(args)
+    return 2  # pragma: no cover - argparse enforces
 
 
 def main() -> None:

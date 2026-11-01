@@ -7,6 +7,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from parking_report.stats_cli import run
 
@@ -271,3 +272,85 @@ class PlatesLedgerTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RefreshCommandTest(unittest.TestCase):
+    """`p106-stats refresh`: mocked fetch + archived export union (#232)."""
+
+    ENV = {
+        "PARKING_106_SUBSCRIPTION_KEY": "synthetic-key",
+        "PARKING_106_USERNAME": "synthetic-user",
+        "PARKING_106_PASSWORD": "synthetic-pass",
+        "PARKING_REPORTER_ID_NUMBER": "000000000",
+    }
+
+    def _inc(self, case_number, status="בטיפול"):
+        return {
+            "case_number": case_number,
+            "createdon": "2026-05-02T08:00:00",
+            "streetname": "רחוב הדוגמה",
+            "housenumber": "2",
+            "subjectname": "חניה אסורה - חניה על מדרכה",
+            "statusname": status,
+        }
+
+    def test_refresh_unions_archive_and_fetch(self):
+        fetched = [
+            self._inc("2000-000001", "סיום טיפול"),  # overlaps the archive
+            self._inc("2000-999999"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            union_path = Path(tmp) / "union.json"
+            with (
+                mock.patch.dict("os.environ", self.ENV, clear=False),
+                mock.patch(
+                    "parking_report.stats_cli._fetch_incidents",
+                    return_value=fetched,
+                ) as fetch,
+            ):
+                code = run(
+                    [
+                        "refresh",
+                        "-o",
+                        str(out),
+                        "--archive",
+                        str(FIXTURES / "export_a.json"),
+                        "--save-union",
+                        str(union_path),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            fetch.assert_called_once()
+            summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+            # 10 archived rows, one overwritten, one appended.
+            self.assertEqual(summary["total_incidents"], 11)
+            self.assertEqual(summary["inputs"], ["export_a.json", "GetContactCases"])
+            union = json.loads(union_path.read_text(encoding="utf-8"))
+            self.assertEqual(len(union["incidents"]), 11)
+            by_case = {i.get("case_number"): i for i in union["incidents"]}
+            self.assertEqual(by_case["2000-000001"]["statusname"], "סיום טיפול")
+            self.assertIn("2000-999999", by_case)
+            for name in ("monthly.csv", "categories.csv", "streets.csv", "report.html"):
+                self.assertTrue((out / name).exists(), name)
+
+    def test_refresh_without_archive_builds_from_fetch_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            with (
+                mock.patch.dict("os.environ", self.ENV, clear=False),
+                mock.patch(
+                    "parking_report.stats_cli._fetch_incidents",
+                    return_value=[self._inc("2000-000042")],
+                ),
+            ):
+                code = run(["refresh", "-o", str(out)])
+            self.assertEqual(code, 0)
+            summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["total_incidents"], 1)
+
+    def test_refresh_missing_env_fails_cleanly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict("os.environ", {}, clear=True):
+                code = run(["refresh", "-o", str(Path(tmp) / "out")])
+            self.assertEqual(code, 1)

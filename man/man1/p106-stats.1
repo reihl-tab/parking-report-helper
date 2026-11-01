@@ -45,6 +45,32 @@ ledger itself never leaves the machine.
 .TP
 \fIinputs\fR
 Reports_raw.json export file(s)
+.SS "refresh options"
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show this help message and exit.
+.TP
+\fB\-\-output\fR, \fB\-o\fR \fIOUTPUT\fR
+Output directory for summary.json, the CSV tables and report.html.
+Required.
+.TP
+\fB\-\-archive\fR \fIARCHIVE\fR
+Archived reports_raw.json export (repeatable); fetched rows win when a
+case_number appears in both. Default: [].
+.TP
+\fB\-\-from\fR \fIFROM_DATE\fR
+First case date to fetch, YYYY\-MM\-DD (default: 2021\-01\-01) Default:
+2021\-01\-01.
+.TP
+\fB\-\-top\-streets\fR \fITOP_STREETS\fR
+How many streets to keep in by_street (default: 20) Default: 20.
+.TP
+\fB\-\-plates\-ledger\fR \fIPLATES_LEDGER\fR
+Optional private filing\-ledger CSV (same aggregation as build)
+.TP
+\fB\-\-save\-union\fR \fISAVE_UNION\fR
+Optional path for the merged raw export (PRIVATE: contains case texts;
+keep outside any published repository)
 .SH EXIT STATUS
 .TP
 .B 0

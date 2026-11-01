@@ -388,3 +388,35 @@ def summarize(
         },
     }
     return summary
+
+
+def union_with_fetched(
+    archived: list[dict], fetched: list[dict]
+) -> tuple[list[dict], int]:
+    """Union archived export rows with live-fetched rows by case_number.
+
+    Fetched rows win on overlap (they carry the current status); archived
+    rows without a case_number cannot collide and are kept as-is, fetched
+    rows without one raise StatsError (a live row with no identity would
+    silently duplicate its archived copy). Returns (merged, overlaps).
+    """
+    keys: dict[str, int] = {}
+    merged: list[dict] = []
+    for incident in archived:
+        case_number = incident.get("case_number")
+        if isinstance(case_number, str) and case_number.strip():
+            keys[case_number.strip()] = len(merged)
+        merged.append(incident)
+    overlaps = 0
+    for incident in fetched:
+        case_number = incident.get("case_number")
+        if not isinstance(case_number, str) or not case_number.strip():
+            raise StatsError("fetched incident without a case_number")
+        key = case_number.strip()
+        if key in keys:
+            merged[keys[key]] = incident
+            overlaps += 1
+        else:
+            keys[key] = len(merged)
+            merged.append(incident)
+    return merged, overlaps

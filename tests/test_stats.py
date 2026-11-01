@@ -16,6 +16,7 @@ from parking_report.stats import (
     plate_digits,
     plates_summary,
     summarize,
+    union_with_fetched,
 )
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "stats"
@@ -450,3 +451,44 @@ class PlatesSummaryTest(unittest.TestCase):
             self.assertEqual(rows, [])
             rows, _ = plates_summary(ledger, min_count=2)
             self.assertEqual(len(rows), 1)
+
+
+class UnionWithFetchedTest(unittest.TestCase):
+    """union_with_fetched: fetched rows win on overlap (#232)."""
+
+    def _inc(self, case_number, status="בטיפול"):
+        return {
+            "case_number": case_number,
+            "createdon": "2026-05-01T08:00:00",
+            "streetname": "רחוב הדוגמה",
+            "housenumber": "1",
+            "subjectname": "חניה אסורה - חניה על מדרכה",
+            "statusname": status,
+        }
+
+    def test_fetched_wins_on_overlap(self):
+        archived = [self._inc("1000-1", "סיום טיפול"), self._inc("1000-2")]
+        fetched = [self._inc("1000-2", "סיום טיפול"), self._inc("1000-3")]
+        merged, overlaps = union_with_fetched(archived, fetched)
+        self.assertEqual(overlaps, 1)
+        self.assertEqual(
+            [i["case_number"] for i in merged], ["1000-1", "1000-2", "1000-3"]
+        )
+        self.assertEqual(merged[1]["statusname"], "סיום טיפול")
+
+    def test_archived_row_without_case_number_is_kept(self):
+        archived = [{"streetname": "רחוב הדוגמה", "createdon": "2026-05-01T08:00:00"}]
+        merged, overlaps = union_with_fetched(archived, [self._inc("1000-9")])
+        self.assertEqual((len(merged), overlaps), (2, 0))
+        self.assertIsNone(merged[0].get("case_number"))
+
+    def test_fetched_row_without_case_number_raises(self):
+        with self.assertRaises(StatsError):
+            union_with_fetched([], [{"streetname": "רחוב הדוגמה"}])
+
+    def test_whitespace_case_numbers_match(self):
+        merged, overlaps = union_with_fetched(
+            [self._inc(" 1000-4 ")], [self._inc("1000-4", "סיום טיפול")]
+        )
+        self.assertEqual((len(merged), overlaps), (1, 1))
+        self.assertEqual(merged[0]["statusname"], "סיום טיפול")
