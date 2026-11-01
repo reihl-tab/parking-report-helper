@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -181,7 +182,13 @@ class Synthetic(unittest.TestCase):
         self.assertGreaterEqual(text.count("if: ${{ always() }}"), 2)
         self.assertIn("--coverage coverage.json", text)
         self.assertIn('exit "$status"', text)
-        self.assertNotIn("continue-on-error: true", text)
+        # continue-on-error is banned for gating jobs; the single allowed
+        # exception is the informational Python 3.15 job (#216), which must
+        # never block a merge. Exactly one occurrence, inside py315 only.
+        self.assertEqual(text.count("continue-on-error: true"), 1)
+        py315 = re.search(r"(?ms)^  py315:.*?(?=^  \w|\Z)", text)
+        self.assertIsNotNone(py315, "py315 informational job missing")
+        self.assertIn("continue-on-error: true", py315.group(0))
 
 
 if __name__ == "__main__":

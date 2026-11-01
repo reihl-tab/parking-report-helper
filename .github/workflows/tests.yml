@@ -41,6 +41,28 @@ jobs:
         if: ${{ always() }}
         run: python scripts/ci_test_report.py summary --metrics test-results.json
 
+  py315:
+    name: Python 3.15 (informational)
+    # Informational Python 3.15 check (#216): continue-on-error, never a
+    # gate. Runtime stays 3.13.
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.15'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install package
+        run: python -m pip install ".[api]"
+      - name: Run unit and CLI tests (informational)
+        run: python scripts/ci_test_report.py run --start tests --output test-results.json
+      - name: Publish test summary
+        if: ${{ always() }}
+        run: python scripts/ci_test_report.py summary --metrics test-results.json
+
   coverage:
     name: Coverage report
     runs-on: ubuntu-24.04
