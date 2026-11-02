@@ -150,6 +150,30 @@ so an existing link or hard-linked file is never written through or
 `chmod`-ed. The installer is not safe against a concurrent attacker: run it
 only on directories nobody else can write to while it runs.
 
+Stale pages (#204). The installer removes a page only if it installed that
+page itself. Each successful install writes
+`$DESTDIR$PREFIX/share/man/.parking-report-helper-man1.manifest` (in
+`share/man`, not `man1`, because `mandb` warns about any non-page file in
+`man1`): a fixed header line, then one `<sha256>  <page>` line per page it
+installed, sorted, so the same pages always give the same bytes. On the next
+install a page is removed (`removed stale <page>` on stdout) only when it is
+listed in the previous manifest, is no longer shipped, is still a regular
+file in `man1` and still has the recorded SHA-256. A listed page that is now
+a symlink or anything but a regular file, or whose bytes changed, is kept
+(`kept stale <page> (...)`) and not followed. A manifest entry must be a
+plain page name ending in `.1` (no `/`, no leading `.`); one bad line, an
+unknown header, a duplicate, non-ASCII bytes or a file over 64 KiB makes the
+installer ignore the whole manifest: it removes nothing, prints
+`install_manpages: previous manifest ignored error=ManifestError; no stale
+page removed` to stderr and still exits 0. A missing manifest (first install,
+or an install made before #204) owns nothing; a manifest path that is a
+symlink or directory is refused like a page (`error=UnsafePathError`). The
+new manifest is written last and lists exactly the pages installed this time,
+so kept pages are disowned and an interrupted cleanup is retried. Pages that
+were never in a manifest, pages with similar names and pages in other
+sections are never touched. There is no dry-run mode, and the same
+concurrent-writer caveat as above applies.
+
 Type checks: the configured `mypy` run covers `src` only. The two scripts
 check clean when run explicitly with the source tree on the path,
 `MYPYPATH=src mypy scripts/gen_manpages.py scripts/install_manpages.py`
