@@ -35,8 +35,12 @@ class CorpusTest(unittest.TestCase):
                         f"corpus input {path} still crashes",
                     )
                 replayed += 1
-        # The corpus starts empty; keep the assertion meaningful when it grows.
-        self.assertGreaterEqual(replayed, 0)
+        # Every corpus file on disk must have been replayed above: a drifted
+        # glob or skipped directory fails here instead of passing vacuously.
+        expected = sum(
+            len(list(d.glob("*.bin"))) for d in CORPUS.iterdir() if d.is_dir()
+        )
+        self.assertEqual(replayed, expected)
 
     def test_seeded_smoke_run_finds_no_crash(self):
         with tempfile.TemporaryDirectory() as tmp:
