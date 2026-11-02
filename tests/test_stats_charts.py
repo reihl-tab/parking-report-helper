@@ -56,6 +56,11 @@ class HorizontalBarsTest(unittest.TestCase):
 
 
 class ChartBuildersTest(unittest.TestCase):
+    def test_zero_value_bar_renders_no_sliver(self):
+        svg = horizontal_bars([("אפס", 0), ("אחת", 1)], title="t")
+        self.assertIn('width="0"', svg)
+        self.assertNotIn('width="2"', svg)
+
     def test_each_builder_renders(self):
         for chart in (
             monthly_chart(MONTHS),

@@ -46,7 +46,8 @@ def horizontal_bars(
     ]
     y = PADDING + 30
     for label, value in series:
-        bar_len = max(2, round(400 * value / maximum))
+        # Zero counts render as no bar at all, not a misleading sliver (#226).
+        bar_len = 0 if value == 0 else max(2, round(400 * value / maximum))
         parts.append(
             f'<text x="{width - PADDING}" y="{y + 15}" text-anchor="end" '
             f'font-size="13">{_esc(label)}</text>'
