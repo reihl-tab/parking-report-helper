@@ -7,6 +7,14 @@ from parking_report import REQUIRED, Car, build_report, build_reports, format_da
 CAR = {"plate": "00-000-00", "street": "Example 1", "datetime": "2026-01-02 03:04"}
 
 
+class TestCarFromMappingRobustness(unittest.TestCase):
+    def test_non_string_draft_kind_is_value_error(self):
+        # A list draft_kind hit "kind not in {...}" with an unhashable type
+        # (TypeError) instead of the documented ValueError (#245 review).
+        with self.assertRaises(ValueError):
+            Car.from_mapping({"draft_kind": []})
+
+
 class TestValidation(unittest.TestCase):
     def test_required_fields_are_nonempty_strings(self):
         for field in REQUIRED:

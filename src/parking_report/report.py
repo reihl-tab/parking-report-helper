@@ -38,7 +38,7 @@ class Car:
         if not isinstance(data, Mapping):
             raise ValueError("each car must be a JSON object")  # noqa: TRY004 - malformed input data; callers catch ValueError
         kind = data.get("draft_kind", "parking")
-        if kind not in {"parking", "municipal_issue"}:
+        if not isinstance(kind, str) or kind not in {"parking", "municipal_issue"}:
             raise ValueError("unknown draft kind")
         required = (
             REQUIRED

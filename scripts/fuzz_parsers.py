@@ -58,7 +58,15 @@ SEEDS: dict[str, list[bytes]] = {
         b"[]",
         b"{}",
     ],
-    "cars-json": [b"[]", b"[{}]", b'[{"plate": "synthetic"}]', b"{}"],
+    "cars-json": [
+        b"[]",
+        b"[{}]",
+        b'[{"plate": "synthetic"}]',
+        b"{}",
+        # Structured edge: a non-string draft_kind must raise ValueError, not
+        # TypeError (unhashable membership probe), post-#245 review.
+        b'[{"draft_kind": []}]',
+    ],
     "intake-record": [b"{}", b'{"cars": []}', b"null", b'{"plate": "x"}'],
     "parse-datetime": [
         b"2026-05-01T08:00:00",
