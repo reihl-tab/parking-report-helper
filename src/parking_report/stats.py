@@ -174,6 +174,25 @@ def _hotspots(incidents: list[dict], limit: int, min_count: int) -> dict[str, in
     return {spot: count for spot, count in ordered[:limit] if count >= min_count}
 
 
+def _calendar_weeks(
+    counts: dict[str, int], weeks: int, today: dt.date
+) -> dict[str, int]:
+    """Trailing `weeks` calendar weeks ending with today's ISO week, zero-filled.
+
+    Report-free weeks stay visible as zero instead of silently dropping out of
+    the chart (#222).
+    """
+    end_monday = today - dt.timedelta(days=today.weekday())
+    result: dict[str, int] = {}
+    for back in range(weeks - 1, -1, -1):
+        monday = end_monday - dt.timedelta(weeks=back)
+        iso = monday.isocalendar()
+        result[f"{iso.year:04d}-W{iso.week:02d}"] = counts.get(
+            f"{iso.year:04d}-W{iso.week:02d}", 0
+        )
+    return result
+
+
 def _by_neighborhood(
     incidents: list[dict], neighborhoods: dict[str, str] | None
 ) -> dict[str, int] | None:
@@ -333,6 +352,7 @@ def summarize(
     min_hotspot_count: int = 3,
     weeks: int = 12,
     neighborhoods: dict[str, str] | None = None,
+    today: dt.date | None = None,
 ) -> dict:
     """Aggregate incidents into the summary document consumed by the CLI."""
     created_dates = [
@@ -361,7 +381,7 @@ def summarize(
             "last": max(created_dates).date().isoformat() if created_dates else None,
         },
         "by_month": dict(sorted(_count(months).items())),
-        "by_week": dict(list(sorted(_count(iso_weeks).items()))[-weeks:]),
+        "by_week": _calendar_weeks(_count(iso_weeks), weeks, today or dt.date.today()),
         "hotspots": _hotspots(incidents, top_hotspots, min_hotspot_count),
         "by_neighborhood": _by_neighborhood(incidents, neighborhoods),
         "by_category": by_category,

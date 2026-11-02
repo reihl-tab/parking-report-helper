@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import unittest
 from pathlib import Path
 
@@ -81,7 +82,7 @@ class SummarizeTest(unittest.TestCase):
         cls.incidents, cls.duplicates = load_incidents(
             [FIXTURES / "export_a.json", FIXTURES / "export_b.json"]
         )
-        cls.summary = summarize(cls.incidents)
+        cls.summary = summarize(cls.incidents, today=dt.date(2026, 7, 31))
 
     def test_totals_and_range(self):
         self.assertEqual(self.summary["total_incidents"], 13)
@@ -126,7 +127,16 @@ class SummarizeTest(unittest.TestCase):
     def test_by_week_trailing_and_hotspots(self):
         by_week = self.summary["by_week"]
         self.assertTrue(all(key.startswith("2026-W") for key in by_week))
-        self.assertEqual(sum(by_week.values()), 12)
+        # Trailing 12 calendar weeks ending 2026-W31, zero-filled (#222):
+        # the report-free W20-W22/W24-W26/W28-W31 stay visible as zero and
+        # the older W18 incidents fall outside the window.
+        self.assertEqual(list(by_week)[:2], ["2026-W20", "2026-W21"])
+        self.assertEqual(list(by_week)[-1], "2026-W31")
+        self.assertEqual(len(by_week), 12)
+        self.assertEqual(by_week["2026-W22"], 0)
+        self.assertEqual(by_week["2026-W23"], 4)
+        self.assertEqual(by_week["2026-W27"], 4)
+        self.assertEqual(sum(by_week.values()), 8)
         self.assertEqual(next(iter(self.summary["hotspots"])), "רחוב הדוגמה 1")
 
     def test_streetless_incidents_are_not_hotspots(self):
