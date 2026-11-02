@@ -39,29 +39,72 @@ Path safety (#207):
   staging tree at the same time can still race it (for example by swapping
   an entry between the check and the replace; os.replace then replaces the
   swapped entry itself, it does not write through it).
+
+Stale pages (#204): the installer owns only the pages it wrote itself. After
+a successful copy it records them, with the SHA-256 of the bytes it wrote, in
+a manifest next to man1, share/man/.parking-report-helper-man1.manifest (in
+share/man, not man1, so mandb does not warn about a bogus page name). On the
+next install a page is removed only when all of these hold:
+
+- it is listed in the previous manifest and is no longer shipped;
+- its manifest name is a plain page name (no "/", no leading ".", ends in
+  ".1"); the whole manifest is ignored otherwise, so an entry such as
+  "../x.1" or "/etc/x.1" can never name a file outside man1;
+- the entry in man1 is a regular file (a symlink, directory or anything
+  else is kept, never followed) whose bytes still match the recorded hash
+  (a page someone edited or replaced since is kept).
+
+A missing manifest (first install, or an install made before #204) owns
+nothing. An unreadable or malformed manifest is ignored as a whole: nothing
+is removed and one line naming only the error class goes to stderr; the
+install still succeeds. Pages that are kept are disowned: the new manifest
+lists exactly the pages installed this time, so they are never retried.
+Unrelated pages, including ones with similar names or in other sections,
+are never listed and therefore never touched. There is no dry-run mode; the
+manifest is written last, so an interrupted cleanup is retried next time.
 """
 
 from __future__ import annotations
 
 import argparse
 import errno
+import hashlib
 import importlib.util
 import os
 import posixpath
+import re
 import stat
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from types import ModuleType
+from typing import NamedTuple
 
 HERE = Path(__file__).resolve().parent
 LOG_NAME = "install_manpages"
 MAN_SUBDIR = ("share", "man", "man1")
 PAGE_MODE = 0o644
+MANIFEST_NAME = ".parking-report-helper-man1.manifest"
+MANIFEST_HEADER = "# parking-report-helper man1 pages installed by install_manpages.py"
+MANIFEST_MAX_BYTES = 64 * 1024
+PAGE_MAX_BYTES = 1024 * 1024
+PAGE_NAME = r"[A-Za-z0-9][A-Za-z0-9._+-]*\.1"
+MANIFEST_LINE = re.compile(r"([0-9a-f]{64})  (" + PAGE_NAME + r")")
 
 
 class UnsafePathError(OSError):
     """A symlink or non-regular entry where the installer would write."""
+
+
+class ManifestError(ValueError):
+    """The previous manifest is unreadable or not in the expected format."""
+
+
+class Result(NamedTuple):
+    installed: list[str]
+    removed: list[str]
+    kept: list[tuple[str, str]]
+    manifest_error: str | None
 
 
 def _generator() -> ModuleType:
@@ -146,27 +189,149 @@ def _replace_page(data: bytes, name: str, dir_fd: int) -> None:
         raise
 
 
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def format_manifest(data: Mapping[str, bytes]) -> bytes:
+    """Manifest bytes: a fixed header, then "<sha256>  <page>" sorted by page."""
+    lines = [MANIFEST_HEADER]
+    lines += [f"{_sha256(data[page])}  {page}" for page in sorted(data)]
+    return ("\n".join(lines) + "\n").encode("ascii")
+
+
+def parse_manifest(raw: bytes) -> dict[str, str]:
+    """Page name -> recorded SHA-256. Any deviation rejects the whole file."""
+    try:
+        text = raw.decode("ascii")
+    except UnicodeDecodeError:
+        raise ManifestError("not ASCII") from None
+    if not text.endswith("\n"):
+        raise ManifestError("truncated")
+    lines = text[:-1].split("\n")
+    if lines[0] != MANIFEST_HEADER:
+        raise ManifestError("unknown header")
+    owned: dict[str, str] = {}
+    for line in lines[1:]:
+        match = MANIFEST_LINE.fullmatch(line)
+        if match is None or match.group(2) in owned:
+            raise ManifestError("bad entry")
+        owned[match.group(2)] = match.group(1)
+    return owned
+
+
+def _read_regular(name: str, dir_fd: int, limit: int) -> bytes | None:
+    """Bytes of a regular file entry (never followed), None if it is not one.
+
+    Raises ValueError when the file is larger than limit.
+    """
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    try:
+        fd = os.open(name, flags, dir_fd=dir_fd)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            return None
+        raise
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return None
+        chunks = []
+        size = 0
+        while chunk := os.read(fd, 65536):
+            chunks.append(chunk)
+            size += len(chunk)
+            if size > limit:
+                raise ValueError("file too large")
+        return b"".join(chunks)
+    finally:
+        os.close(fd)
+
+
+def read_manifest(dir_fd: int) -> dict[str, str]:
+    """The previous manifest; {} when there is none. Raises ManifestError."""
+    try:
+        raw = _read_regular(MANIFEST_NAME, dir_fd, MANIFEST_MAX_BYTES)
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError):
+        raise ManifestError("unreadable") from None
+    if raw is None:
+        raise ManifestError("not a regular file")
+    return parse_manifest(raw)
+
+
+def remove_stale(
+    owned: Mapping[str, str], shipped: Sequence[str], dir_fd: int
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Remove owned pages that are no longer shipped and still unchanged."""
+    removed: list[str] = []
+    kept: list[tuple[str, str]] = []
+    for page in sorted(set(owned) - set(shipped)):
+        try:
+            before = os.lstat(page, dir_fd=dir_fd)
+        except FileNotFoundError:
+            continue
+        data = None
+        if stat.S_ISREG(before.st_mode):
+            try:
+                data = _read_regular(page, dir_fd, PAGE_MAX_BYTES)
+            except FileNotFoundError:
+                continue
+            except ValueError:
+                kept.append((page, "changed since install"))
+                continue
+        if data is None:
+            kept.append((page, "not a regular file"))
+            continue
+        if _sha256(data) != owned[page]:
+            kept.append((page, "changed since install"))
+            continue
+        os.unlink(page, dir_fd=dir_fd)
+        removed.append(page)
+    return removed, kept
+
+
 def install(
-    source: Path, root: Path, below: Sequence[str], pages: Sequence[str]
-) -> list[str]:
+    source: Path,
+    root: Path,
+    below: Sequence[str],
+    pages: Sequence[str],
+    at: Callable[[str], None] = lambda stage: None,
+) -> Result:
     missing = [p for p in pages if not (source / p).is_file()]
     if missing:
         raise FileNotFoundError("a shipped page is missing")
     data = {page: (source / page).read_bytes() for page in pages}
     root.mkdir(parents=True, exist_ok=True)
     fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    man_fd = -1
     try:
-        for name in below:
+        for index, name in enumerate(below):
             child = _open_dir(name, fd)
-            os.close(fd)
+            if index == len(below) - 1:
+                man_fd = fd  # share/man, where the manifest lives
+            else:
+                os.close(fd)
             fd = child
+        _check_entry(MANIFEST_NAME, man_fd)
         for page in pages:
             _check_entry(page, fd)
+        manifest_error = None
+        try:
+            owned = read_manifest(man_fd)
+        except ManifestError as exc:
+            owned, manifest_error = {}, type(exc).__name__
         for page in pages:
             _replace_page(data[page], page, fd)
+        at("cleanup")
+        removed, kept = remove_stale(owned, pages, fd)
+        at("manifest")
+        _replace_page(format_manifest(data), MANIFEST_NAME, man_fd)
     finally:
         os.close(fd)
-    return list(pages)
+        if man_fd >= 0:
+            os.close(man_fd)
+    return Result(list(pages), removed, kept, manifest_error)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -190,13 +355,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         log.at("destination")
         root, below = plan(args.prefix, args.destdir)
         log.at("copy")
-        installed = install(args.source, root, below, pages)
+        result = install(args.source, root, below, pages, log.at)
     except Exception as exc:  # noqa: BLE001 - stage and class only, no text
         log.failed(exc)
         return 1
     log.at("done")
-    for page in installed:
+    if result.manifest_error:
+        sys.stderr.write(
+            f"{LOG_NAME}: previous manifest ignored "
+            f"error={result.manifest_error}; no stale page removed\n"
+        )
+    for page in result.installed:
         print(f"installed {page}")
+    for page in result.removed:
+        print(f"removed stale {page}")
+    for page, reason in result.kept:
+        print(f"kept stale {page} ({reason})")
     return 0
 
 

@@ -236,7 +236,8 @@ class InstallTests(unittest.TestCase):
         result = self.run_install(PREFIX="/opt/plh")
         self.assertEqual(result.returncode, 0, result.stderr)
         expected = sorted(f"opt/plh/share/man/man1/{c}.1" for c in SHIPPED)
-        self.assertEqual(self.installed(), expected)
+        manifest = "opt/plh/share/man/.parking-report-helper-man1.manifest"  # #204
+        self.assertEqual(self.installed(), sorted([*expected, manifest]))
         for rel in expected:
             name = Path(rel).name
             self.assertEqual(
@@ -250,7 +251,7 @@ class InstallTests(unittest.TestCase):
         result = self.run_install()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(
-            all(p.startswith("usr/local/share/man/man1/") for p in self.installed())
+            all(p.startswith("usr/local/share/man/") for p in self.installed())
         )
         result = self.run_install("--prefix", "/srv/x", PREFIX="/ignored")
         self.assertEqual(result.returncode, 0, result.stderr)
