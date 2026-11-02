@@ -13,8 +13,10 @@ Contract: parsers may fail with ``ValueError``/``OSError`` (including
 ``json.JSONDecodeError`` and ``UnicodeError`` subclasses); anything else -
 ``TypeError``, ``KeyError``, ``IndexError``, ``RecursionError`` - is a
 crash: the offending input is saved to the corpus directory and the run
-exits 1. Deterministic given ``--seed``; wall-clock bounded by
-``--seconds``. No network, no credentials, synthetic inputs only.
+exits 1. Deterministic given ``--seed``; bounded by ``--iterations`` when
+given (fully deterministic, machine-independent), otherwise wall-clock
+bounded by ``--seconds``. No network, no credentials, synthetic inputs
+only.
 """
 
 from __future__ import annotations
@@ -149,25 +151,32 @@ def fuzz(
     target_name: str,
     *,
     seed: int,
-    seconds: float,
+    seconds: float | None = None,
+    iterations: int | None = None,
     corpus_dir: Path,
     max_crashes: int = 20,
 ) -> int:
+    if seconds is None and iterations is None:
+        raise ValueError("pass seconds or iterations")
     rng = random.Random(f"{seed}:{target_name}")
     target = TARGETS[target_name]
     seeds = SEEDS[target_name]
-    deadline = time.monotonic() + seconds
-    iterations = 0
+    deadline = None if seconds is None else time.monotonic() + seconds
+    done = 0
     crashes: list[str] = []
-    while time.monotonic() < deadline and len(crashes) < max_crashes:
+    while len(crashes) < max_crashes:
+        if deadline is not None and time.monotonic() >= deadline:
+            break
+        if iterations is not None and done >= iterations:
+            break
         data = mutate(rng, rng.choice(seeds))
         crash = run_target(target, data)
-        iterations += 1
+        done += 1
         if crash is not None:
             path = save_crasher(corpus_dir, target_name, data)
             crashes.append(f"{crash} -> {path}")
     print(
-        f"fuzz[{target_name}]: {iterations} iterations, "
+        f"fuzz[{target_name}]: {done} iterations, "
         f"{len(crashes)} crash(es) (seed={seed})"
     )
     for line in crashes:
@@ -181,7 +190,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--target", choices=sorted(TARGETS), action="append")
     parser.add_argument("--seed", type=int, default=180)
-    parser.add_argument("--seconds", type=float, default=30.0)
+    parser.add_argument("--seconds", type=float, default=None)
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=None,
+        help="fixed iteration count (deterministic); overrides the default "
+        "30-second wall-clock bound when given",
+    )
     parser.add_argument(
         "--corpus-dir",
         type=Path,
@@ -191,8 +207,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     status = 0
     for name in args.target or sorted(TARGETS):
+        seconds = args.seconds
+        if seconds is None and args.iterations is None:
+            seconds = 30.0
         status |= fuzz(
-            name, seed=args.seed, seconds=args.seconds, corpus_dir=args.corpus_dir
+            name,
+            seed=args.seed,
+            seconds=None if args.iterations is not None else seconds,
+            iterations=args.iterations,
+            corpus_dir=args.corpus_dir,
         )
     return status
 

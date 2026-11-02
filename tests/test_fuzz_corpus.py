@@ -46,7 +46,7 @@ class CorpusTest(unittest.TestCase):
                         fuzz_parsers.fuzz(
                             name,
                             seed=180,
-                            seconds=2.0,
+                            iterations=200,
                             corpus_dir=Path(tmp),
                         ),
                         0,
