@@ -4,7 +4,8 @@
 Targets the surfaces that read untrusted files:
 
 - ``stats-export``: ``stats.load_incidents`` on a mutated export file;
-- ``cars-json``: ``cli._read_json`` (reporter/cars JSON) on a mutated file;
+- ``cars-json``: ``cli._read_json`` plus the downstream
+  ``municipality.build_submissions`` parse path on a mutated file;
 - ``intake-record``: ``intake.read_intake`` on a tree whose report.json is
   mutated;
 - ``parse-datetime``: ``stats.parse_datetime`` on mutated text.
@@ -32,7 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from parking_report import cli, intake, stats  # noqa: E402
+from parking_report import cli, intake, municipality, stats  # noqa: E402
 
 ALLOWED = (ValueError, OSError)
 
@@ -75,11 +76,19 @@ def target_stats_export(data: bytes) -> None:
         stats.load_incidents([path])
 
 
+_CARS_CONFIG: dict | None = None
+
+
 def target_cars_json(data: bytes) -> None:
+    global _CARS_CONFIG
+    if _CARS_CONFIG is None:
+        _CARS_CONFIG = municipality.load_config("jerusalem")
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "cars.json"
         path.write_bytes(data)
-        cli._read_json(str(path))
+        cars = cli._read_json(str(path))
+    # Downstream parsing path, not just JSON loading (#227).
+    municipality.build_submissions(cars, _CARS_CONFIG, {}, False)
 
 
 def target_intake_record(data: bytes) -> None:
