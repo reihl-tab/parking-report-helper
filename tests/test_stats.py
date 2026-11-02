@@ -157,6 +157,8 @@ class SummarizeTest(unittest.TestCase):
         )
         lowered = summarize(self.incidents, min_hotspot_count=2)
         self.assertIn("רחוב הסינתטי 1", lowered["hotspots"])
+
+    def test_by_neighborhood_is_none_without_a_mapping(self):
         self.assertIsNone(self.summary["by_neighborhood"])
 
     def test_neighborhood_mapping(self):
