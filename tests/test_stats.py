@@ -140,10 +140,13 @@ class SummarizeTest(unittest.TestCase):
         self.assertEqual(next(iter(self.summary["hotspots"])), "רחוב הדוגמה 1")
 
     def test_streetless_incidents_are_not_hotspots(self):
-        # Fixture: one incident has streetname null; it must not appear as a spot.
-        self.assertNotIn("(ללא רחוב)", self.summary["hotspots"])
+        # Fixture: one incident has streetname null. The default floor of 3
+        # would drop it anyway, so lower the floor to 1: without the #218
+        # exclusion the streetless bucket would surface as a hotspot here.
+        lowered = summarize(self.incidents, min_hotspot_count=1)
+        self.assertNotIn("(ללא רחוב)", lowered["hotspots"])
         self.assertFalse(
-            any(spot.startswith(NO_STREET) for spot in self.summary["hotspots"])
+            any(spot.startswith(NO_STREET) for spot in lowered["hotspots"])
         )
 
     def test_hotspots_below_the_minimum_count_floor_are_dropped(self):
