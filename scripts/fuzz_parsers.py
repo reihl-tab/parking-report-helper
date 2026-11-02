@@ -66,6 +66,10 @@ SEEDS: dict[str, list[bytes]] = {
         # Structured edge: a non-string draft_kind must raise ValueError, not
         # TypeError (unhashable membership probe), post-#245 review.
         b'[{"draft_kind": []}]',
+        # A fully valid car, so mutations also start from the success path
+        # through build_submissions rather than only error paths.
+        b'[{"plate": "123-45-678", "street": "synthetic street 1", '
+        b'"datetime": "2026-01-01T10:00"}]',
     ],
     "intake-record": [b"{}", b'{"cars": []}', b"null", b'{"plate": "x"}'],
     "parse-datetime": [
@@ -95,8 +99,10 @@ def target_cars_json(data: bytes) -> None:
         path = Path(tmp) / "cars.json"
         path.write_bytes(data)
         cars = cli._read_json(str(path))
-    # Downstream parsing path, not just JSON loading (#227).
+    # Downstream parsing path, not just JSON loading (#227). Both photo
+    # modes: with_photo only changes the built description text.
     municipality.build_submissions(cars, _CARS_CONFIG, {}, False)
+    municipality.build_submissions(cars, _CARS_CONFIG, {}, True)
 
 
 def target_intake_record(data: bytes) -> None:
