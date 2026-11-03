@@ -161,7 +161,11 @@ install a page is removed (`removed stale <page>` on stdout) only when it is
 listed in the previous manifest, is no longer shipped, is still a regular
 file in `man1` and still has the recorded SHA-256. A listed page that is now
 a symlink or anything but a regular file, or whose bytes changed, is kept
-(`kept stale <page> (...)`) and not followed. A manifest entry must be a
+(`kept stale <page> (...)`) and not followed. A listed page whose read or
+removal fails with an OS error such as `PermissionError` (an unreadable page,
+a sticky or immutable entry) is kept too, as `kept stale <page> (unreadable)`
+or `kept stale <page> (not removable)`, and the install still exits 0 (#257).
+A manifest entry must be a
 plain page name ending in `.1` (no `/`, no leading `.`); one bad line, an
 unknown header, a duplicate, non-ASCII bytes or a file over 64 KiB makes the
 installer ignore the whole manifest: it removes nothing, prints
