@@ -185,7 +185,7 @@ class PageContentTests(unittest.TestCase):
         self.assertEqual(bad, [])
 
 
-@unittest.skipUnless(MAN1.is_dir(), "man/ is not copied into the Docker test image")
+@unittest.skipUnless(MAN1.is_dir(), "man/ is not present in this checkout")
 class DriftTests(unittest.TestCase):
     def test_committed_pages_match_the_generator(self):
         pages = gen.generate(quiet_log())

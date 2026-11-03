@@ -301,7 +301,7 @@ class DriftDetection206(unittest.TestCase):
             self.assertEqual(result.stdout, "4 man pages up to date\n")
 
 
-@unittest.skipUnless(MAN1.is_dir(), "man/ is not copied into the Docker test image")
+@unittest.skipUnless(MAN1.is_dir(), "man/ is not present in this checkout")
 class CommittedPages206(unittest.TestCase):
     def test_committed_th_lines_carry_page_date(self):
         for filename in SHIPPED:
