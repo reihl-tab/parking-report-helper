@@ -16,8 +16,10 @@ Contract: parsers may fail with ``ValueError``/``OSError`` (including
 crash: the offending input is saved to the corpus directory and the run
 exits 1. Deterministic given ``--seed``; bounded by ``--iterations`` when
 given (fully deterministic, machine-independent), otherwise wall-clock
-bounded by ``--seconds``. No network, no credentials, synthetic inputs
-only.
+bounded by ``--seconds``. The two bounds are mutually exclusive, and
+``--iterations`` must be at least 1; either mistake is a usage error (exit
+2) before any fuzzing runs (#246). No network, no credentials, synthetic
+inputs only.
 """
 
 from __future__ import annotations
@@ -207,19 +209,40 @@ def fuzz(
     return 1 if crashes else 0
 
 
+def positive_int(text: str) -> int:
+    """argparse type for ``--iterations``: an integer >= 1 (#246)."""
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {text!r}") from None
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be >= 1, got {value}")
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="fuzz_parsers.py", description=__doc__.splitlines()[0]
     )
     parser.add_argument("--target", choices=sorted(TARGETS), action="append")
     parser.add_argument("--seed", type=int, default=180)
-    parser.add_argument("--seconds", type=float, default=None)
-    parser.add_argument(
-        "--iterations",
-        type=int,
+    # Mutually exclusive (#246): an explicit --seconds with --iterations used
+    # to be silently ignored. Both default to None, so either flag alone (or
+    # neither, meaning 30 s per target) behaves exactly as before.
+    bound = parser.add_mutually_exclusive_group()
+    bound.add_argument(
+        "--seconds",
+        type=float,
         default=None,
-        help="fixed iteration count (deterministic); overrides the default "
-        "30-second wall-clock bound when given",
+        help="wall-clock bound per target (default 30 when neither "
+        "--seconds nor --iterations is given)",
+    )
+    bound.add_argument(
+        "--iterations",
+        type=positive_int,
+        default=None,
+        help="fixed iteration count per target, >= 1 (deterministic, "
+        "machine-independent); cannot be combined with --seconds",
     )
     parser.add_argument(
         "--corpus-dir",
