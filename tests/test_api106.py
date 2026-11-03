@@ -208,6 +208,28 @@ class HebrewFinalLetterTests(unittest.TestCase):
         self.addCleanup(Path(tmp.name).unlink)
         return api106.Addresses(Path(tmp.name))
 
+    def test_explicit_wrong_street_missing_house_rejected(self):
+        addr = self._addresses(
+            [
+                {"StreetCode": "825", "StreetName": "איתמר בן אבי"},
+                {"StreetCode": "4196", "StreetName": "עלי אבן אבי טאלב"},
+            ],
+            [
+                [31.7681, 35.2116, "7ב", "איתמר בן אבי"],
+                [31.79, 35.24, "1", "עלי אבן אבי טאלב"],
+            ],
+        )
+        gps = (31.76814, 35.21149)
+        with self.assertRaisesRegex(api106.InputError, "street is more than"):
+            addr.resolve("עלי אבן אבי טאלב", "7", gps)
+        # The local house suffix need not prevent a valid nearby street.
+        result = addr.resolve("איתמר בן אבי", "7", gps)
+        self.assertEqual(result["street_code"], "825")
+        with self.assertRaisesRegex(api106.InputError, "no usable GPS"):
+            addr.resolve("איתמר בן אבי", "7", None)
+        with self.assertRaisesRegex(api106.InputError, "unique municipal match"):
+            addr.resolve("בן אבי", "7", gps)
+
     def test_resolve_accepts_final_letter_variant(self):
         addr = self._addresses(
             [

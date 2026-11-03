@@ -194,6 +194,19 @@ def street_names(street: Any) -> Any:
     return [name for name in names if name and normalize(name)]
 
 
+def check_street_gps(all_points: Any, code: str, house_points: Any, gps_xy: Any) -> None:
+    """Reject distant exact-name choices when the house is absent (#270)."""
+    if house_points:
+        return  # Existing house-distance guard owns this case.
+    street_points = [p for p in all_points if p[3] == code]
+    if street_points and min(
+        math.hypot(p[0] - gps_xy[0], p[1] - gps_xy[1]) for p in street_points
+    ) > 200:
+        raise InputError(
+            "The supplied street is more than 200 m from the photo GPS. Check the street."
+        )
+
+
 class Addresses:
     def __init__(self, path: Any) -> None:
         data = json_file(path)
@@ -238,6 +251,7 @@ class Addresses:
                     raise InputError(
                         "The supplied address is more than 200 m from the photo GPS. Check the address."
                     )
+                check_street_gps(self.points, code, points, gps_xy)
                 source = "photo_gps"
             else:
                 if not points:
