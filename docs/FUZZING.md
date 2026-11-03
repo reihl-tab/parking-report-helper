@@ -13,10 +13,14 @@ test. Mutations are deterministic for a given `--seed` (default 180). Each
 target's run is bounded either by wall clock (`--seconds`, default 30 per
 target when no bound is given) or by a fixed count (`--iterations`, which
 makes the whole run machine-independent). The two bounds are mutually
-exclusive and `--iterations` must be at least 1: `--seconds` together with
-`--iterations`, or `--iterations 0`/negative, is a usage error (exit 2)
-before anything is fuzzed (#246). No network, credentials or real report
-data: seeds are synthetic and mutations are local.
+exclusive, `--iterations` must be at least 1 and `--seconds` must be a
+finite number greater than 0: `--seconds` together with `--iterations`,
+`--iterations 0`/negative, or `--seconds` 0, negative, `nan` or `inf` is a
+usage error (exit 2) before anything is fuzzed (#246, #262). Called from
+code, `fuzz()` enforces the same bounds itself and raises `ValueError` for
+`iterations < 1` or a non-finite or non-positive `seconds` (#262). No
+network, credentials or real report data: seeds are synthetic and mutations
+are local.
 
 ```sh
 python scripts/fuzz_parsers.py --seconds 60          # all targets
