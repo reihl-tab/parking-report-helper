@@ -19,6 +19,8 @@ COPY scripts ./scripts
 COPY docs ./docs
 # Committed man pages, so the generated-page drift checks run here (#205).
 COPY man ./man
+# Fail, not skip, the man drift tests if man/ is ever missing here (#256).
+ENV PARKING_REQUIRE_MAN_DRIFT=1
 RUN python -m unittest discover -s tests -v
 
 FROM python:3.13-slim@sha256:2d44738ebf4ce5f63b9d9ea871e9c7cfdc0426f7b0c97cac915fd88ded1d86bb AS runtime-base
