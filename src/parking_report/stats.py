@@ -19,6 +19,19 @@ Aggregation notes:
   reported fewer than ``min_hotspot_count`` times (default 3) never
   appears in any output. The floor exists so a published aggregate can
   never single out a one-off address (approved heat-map design, 1.11).
+- Dates and time zones (#242): ``by_week`` is the trailing ``weeks``
+  calendar weeks ending with the ISO week of ``today``. When ``summarize()``
+  gets no ``today`` (the ``p106-stats`` CLI never passes one) it uses
+  ``datetime.date.today()``, the *local* date of the machine running the
+  job, not the UTC date. Near midnight the same export can therefore yield a
+  window ending one ISO week earlier or later depending on the runner's time
+  zone (for example a UTC CI runner versus a machine in Asia/Jerusalem on a
+  Sunday/Monday night). ``by_month`` is not anchored to ``today`` at all: it
+  counts the calendar months that have incidents. Both bucket an incident by
+  its ``createdon`` date as parsed by ``parse_datetime``: a timestamp with an
+  explicit offset is converted to UTC first, a naive timestamp is used as
+  written. Week keys are ISO week-year and week (``date.isocalendar()``,
+  e.g. 2027-01-01 is ``2026-W53``), never the calendar year.
 """
 
 from __future__ import annotations
@@ -180,7 +193,9 @@ def _calendar_weeks(
     """Trailing `weeks` calendar weeks ending with today's ISO week, zero-filled.
 
     Report-free weeks stay visible as zero instead of silently dropping out of
-    the chart (#222).
+    the chart (#222). Keys use the ISO week-year, so a window crossing New
+    Year ends at e.g. ``2026-W53`` for 2027-01-01 (#242). `today` is the
+    caller's date; see the module notes on local versus UTC anchoring.
     """
     end_monday = today - dt.timedelta(days=today.weekday())
     result: dict[str, int] = {}
@@ -354,7 +369,12 @@ def summarize(
     neighborhoods: dict[str, str] | None = None,
     today: dt.date | None = None,
 ) -> dict:
-    """Aggregate incidents into the summary document consumed by the CLI."""
+    """Aggregate incidents into the summary document consumed by the CLI.
+
+    `today` anchors the trailing ``by_week`` window; it defaults to the local
+    ``datetime.date.today()`` of the running machine, not the UTC date (#242).
+    Pass it explicitly for deterministic output.
+    """
     created_dates = [
         parsed
         for parsed in (parse_datetime(i.get("createdon")) for i in incidents)
