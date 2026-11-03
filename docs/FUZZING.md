@@ -9,13 +9,19 @@ Contract: parsers may fail with `ValueError`/`OSError` (including
 `JSONDecodeError`/`UnicodeError`); any other exception is a crash. Crash
 inputs are saved to `tests/fuzz_corpus/<target>/` and replayed by
 `tests/test_fuzz_corpus.py`, so a found bug becomes a permanent regression
-test. Runs are deterministic (`--seed`, default 180) and wall-clock bounded
-(`--seconds`, default 30 per target). No network, credentials or real
-report data: seeds are synthetic and mutations are local.
+test. Mutations are deterministic for a given `--seed` (default 180). Each
+target's run is bounded either by wall clock (`--seconds`, default 30 per
+target when no bound is given) or by a fixed count (`--iterations`, which
+makes the whole run machine-independent). The two bounds are mutually
+exclusive and `--iterations` must be at least 1: `--seconds` together with
+`--iterations`, or `--iterations 0`/negative, is a usage error (exit 2)
+before anything is fuzzed (#246). No network, credentials or real report
+data: seeds are synthetic and mutations are local.
 
 ```sh
 python scripts/fuzz_parsers.py --seconds 60          # all targets
 python scripts/fuzz_parsers.py --target stats-export --seed 42
+python scripts/fuzz_parsers.py --iterations 200      # deterministic count
 ```
 
 ## Honest scope
