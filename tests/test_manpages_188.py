@@ -17,6 +17,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from man_drift_guard import require_man_pages
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 MAN1 = ROOT / "man" / "man1"
@@ -185,8 +187,11 @@ class PageContentTests(unittest.TestCase):
         self.assertEqual(bad, [])
 
 
-@unittest.skipUnless(MAN1.is_dir(), "man/ is not present in this checkout")
 class DriftTests(unittest.TestCase):
+    def setUp(self):
+        # Skip without man/, or fail under PARKING_REQUIRE_MAN_DRIFT=1 (#256).
+        require_man_pages(self, MAN1)
+
     def test_committed_pages_match_the_generator(self):
         pages = gen.generate(quiet_log())
         self.assertEqual(
