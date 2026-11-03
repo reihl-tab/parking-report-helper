@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import math
 import random
 import sys
 import tempfile
@@ -183,6 +184,12 @@ def fuzz(
 ) -> int:
     if seconds is None and iterations is None:
         raise ValueError("pass seconds or iterations")
+    # Same bounds as the CLI (#246, #262): a bound that can never run an
+    # iteration is a caller bug, not a silent 0-iteration "success".
+    if iterations is not None and iterations < 1:
+        raise ValueError(f"iterations must be >= 1, got {iterations}")
+    if seconds is not None and not (math.isfinite(seconds) and seconds > 0):
+        raise ValueError(f"seconds must be finite and > 0, got {seconds}")
     rng = random.Random(f"{seed}:{target_name}")
     target = TARGETS[target_name]
     seeds = SEEDS[target_name]
@@ -220,6 +227,17 @@ def positive_int(text: str) -> int:
     return value
 
 
+def positive_finite_float(text: str) -> float:
+    """argparse type for ``--seconds``: a finite number > 0 (#262)."""
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid float value: {text!r}") from None
+    if not (math.isfinite(value) and value > 0):
+        raise argparse.ArgumentTypeError(f"must be finite and > 0, got {value}")
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="fuzz_parsers.py", description=__doc__.splitlines()[0]
@@ -232,10 +250,10 @@ def main(argv: list[str] | None = None) -> int:
     bound = parser.add_mutually_exclusive_group()
     bound.add_argument(
         "--seconds",
-        type=float,
+        type=positive_finite_float,
         default=None,
-        help="wall-clock bound per target (default 30 when neither "
-        "--seconds nor --iterations is given)",
+        help="wall-clock bound per target, finite and > 0 (default 30 when "
+        "neither --seconds nor --iterations is given)",
     )
     bound.add_argument(
         "--iterations",
