@@ -132,7 +132,9 @@ docker build -t parking-report-helper .
 docker run --rm -v "$PWD:/data:ro" parking-report-helper sample.json
 ```
 
-Run the test suite inside Docker with `docker build --target test .`.
+Run the test suite inside Docker with `docker build --target test .`. The
+test stage sets `PARKING_REQUIRE_MAN_DRIFT=1`, so the man-page drift tests fail
+instead of skipping if `man/` is missing from the image.
 
 ## Offline preview and the API runner
 

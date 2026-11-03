@@ -22,6 +22,8 @@ import textwrap
 import unittest
 from pathlib import Path
 
+from man_drift_guard import require_man_pages
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "gen_manpages.py"
 MAN1 = ROOT / "man" / "man1"
@@ -301,8 +303,11 @@ class DriftDetection206(unittest.TestCase):
             self.assertEqual(result.stdout, "4 man pages up to date\n")
 
 
-@unittest.skipUnless(MAN1.is_dir(), "man/ is not copied into the Docker test image")
 class CommittedPages206(unittest.TestCase):
+    def setUp(self):
+        # Skip without man/, or fail under PARKING_REQUIRE_MAN_DRIFT=1 (#256).
+        require_man_pages(self, MAN1)
+
     def test_committed_th_lines_carry_page_date(self):
         for filename in SHIPPED:
             with self.subTest(page=filename):

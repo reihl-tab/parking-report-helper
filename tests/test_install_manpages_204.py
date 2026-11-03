@@ -52,8 +52,8 @@ def manifest_bytes(entries):
 
 
 def source_pages(tmp):
-    """The committed pages; the Docker test image has no man/, so there the
-    pages are generated into tmp (test_manpages_188 proves they are equal)."""
+    """The committed pages; in a checkout without man/ they are generated
+    into tmp (test_manpages_188 proves they are equal)."""
     if MAN1.is_dir():
         return MAN1
     spec = importlib.util.spec_from_file_location(

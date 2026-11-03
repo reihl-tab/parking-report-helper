@@ -47,8 +47,8 @@ def tree(top):
 
 
 def source_pages(tmp):
-    """The committed pages; the Docker test image has no man/, so there the
-    pages are generated into tmp (the drift test proves they are equal)."""
+    """The committed pages; in a checkout without man/ they are generated
+    into tmp (the drift test proves they are equal)."""
     if MAN1.is_dir():
         return MAN1
     spec = importlib.util.spec_from_file_location(
