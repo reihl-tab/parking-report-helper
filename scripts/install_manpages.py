@@ -52,7 +52,10 @@ next install a page is removed only when all of these hold:
   "../x.1" or "/etc/x.1" can never name a file outside man1;
 - the entry in man1 is a regular file (a symlink, directory or anything
   else is kept, never followed) whose bytes still match the recorded hash
-  (a page someone edited or replaced since is kept).
+  (a page someone edited or replaced since is kept);
+- it can be read and removed: a page whose read or removal fails with an
+  OS error such as PermissionError is kept ("unreadable" / "not removable")
+  instead of failing the install (#257).
 
 A missing manifest (first install, or an install made before #204) owns
 nothing. An unreadable or malformed manifest is ignored as a whole: nothing
@@ -280,13 +283,22 @@ def remove_stale(
             except ValueError:
                 kept.append((page, "changed since install"))
                 continue
+            except OSError:  # e.g. PermissionError on an unreadable page (#257)
+                kept.append((page, "unreadable"))
+                continue
         if data is None:
             kept.append((page, "not a regular file"))
             continue
         if _sha256(data) != owned[page]:
             kept.append((page, "changed since install"))
             continue
-        os.unlink(page, dir_fd=dir_fd)
+        try:
+            os.unlink(page, dir_fd=dir_fd)
+        except FileNotFoundError:
+            continue
+        except OSError:  # e.g. PermissionError from a sticky directory (#257)
+            kept.append((page, "not removable"))
+            continue
         removed.append(page)
     return removed, kept
 
