@@ -72,6 +72,9 @@ OPTION_NOTES: dict[str, dict[str, str]] = {
         "submitted case; needs explicit submission approval.",
         "--approved-followup-sha256": "digest approval for a parent-linked "
         "follow-up manifest; must equal the reviewed digest.",
+        "--approved-shared-photo-sha256": "digest approval for a shared-photo "
+        "manifest (two distinct cars in one original photo); must equal the "
+        "reviewed digest.",
     },
 }
 
