@@ -459,12 +459,12 @@ def _subcommand_lines(
     sub_options = spec.get("subcommands", {}).get(sub_name, {}).get("options", {})
     visible = _visible(sub_parser)
     for action in (a for a in visible if a.option_strings):
-        text = _sentence(_help(action))
+        text = _sentence(_help(action) or "")
         extra = _default_note(sub_options.get(_contract_key(action), {}), text)
         body = " ".join(x for x in (text, extra) if x)
         lines += _option_entry(action, body)
     for action in (a for a in visible if not a.option_strings):
-        lines += _positional_entry(action, _help(action))
+        lines += _positional_entry(action, _help(action) or "")
     return lines
 
 
