@@ -44,6 +44,12 @@ Optional private filing\-ledger CSV; adds a repeat\-plates aggregate
 (plates.csv with plate,reports for 3+ distinct filed reports) \- the
 ledger itself never leaves the machine.
 .TP
+\fB\-\-neighborhoods\fR \fINEIGHBORHOODS\fR
+Optional UTF\-8 JSON file with one object mapping street name to
+neighborhood name; fills by_neighborhood in summary.json (unmapped
+streets count as (אחר)) and adds the neighborhood chart to
+report.html.
+.TP
 \fIinputs\fR
 Reports_raw.json export file(s)
 .SS "refresh options"
@@ -69,6 +75,12 @@ How many streets to keep in by_street (default: 20) Default: 20.
 \fB\-\-plates\-ledger\fR \fIPLATES_LEDGER\fR
 Optional private filing\-ledger CSV (same aggregation as build)
 .TP
+\fB\-\-neighborhoods\fR \fINEIGHBORHOODS\fR
+Optional UTF\-8 JSON file with one object mapping street name to
+neighborhood name; fills by_neighborhood in summary.json (unmapped
+streets count as (אחר)) and adds the neighborhood chart to
+report.html.
+.TP
 \fB\-\-save\-union\fR \fISAVE_UNION\fR
 Optional path for the merged raw export (PRIVATE: contains case texts;
 keep outside any published repository)
@@ -80,9 +92,9 @@ directory; one summary line on stdout.
 .TP
 .B 1
 Input error (missing, unreadable or invalid export file; an unreadable
-\-\-plates\-ledger file; refresh: missing environment variables, a failed
-fetch or union, or an unwritable \-\-save\-union path), \fBp106\-stats: ...\fR
-on stderr.
+\-\-plates\-ledger file; an unreadable or invalid \-\-neighborhoods file;
+refresh: missing environment variables, a failed fetch or union, or an
+unwritable \-\-save\-union path), \fBp106\-stats: ...\fR on stderr.
 .TP
 .B 2
 Usage error (argparse, or an invalid value such as \-\-top\-streets 0 or
