@@ -29,6 +29,17 @@ from .stats import (
 from .stats_html import build_report
 
 PROG = "p106-stats"
+NEIGHBORHOODS_HELP = (
+    "optional UTF-8 JSON file with one object mapping street name to "
+    "neighborhood name; fills by_neighborhood in summary.json (unmapped "
+    "streets count as (אחר)) and adds the neighborhood chart to report.html"
+)
+# Fixed messages: never the path, the file's contents or the parser's text (#225).
+NEIGHBORHOODS_UNREADABLE = "--neighborhoods: the mapping file could not be read"
+NEIGHBORHOODS_INVALID = (
+    "--neighborhoods: the mapping file must be one JSON object mapping "
+    "non-empty street names to non-empty neighborhood names"
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -63,6 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
         "aggregate (plates.csv with plate,reports for 3+ distinct "
         "filed reports) - the ledger itself never leaves the machine",
     )
+    build.add_argument("--neighborhoods", default=None, help=NEIGHBORHOODS_HELP)
     refresh = sub.add_parser(
         "refresh",
         help="fetch current cases from GetContactCases, union with archived "
@@ -98,6 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="optional private filing-ledger CSV (same aggregation as build)",
     )
+    refresh.add_argument("--neighborhoods", default=None, help=NEIGHBORHOODS_HELP)
     refresh.add_argument(
         "--save-union",
         default=None,
@@ -173,6 +186,9 @@ def _refresh(args) -> int:
     plate_rows, code = _plates(args)
     if code:
         return code
+    neighborhoods, code = _neighborhoods(args)
+    if code:
+        return code
     credentials = {
         "subscription_key": subscription_key,
         "login": {"UserName": username, "Password": password},
@@ -199,7 +215,9 @@ def _refresh(args) -> int:
         except OSError as exc:
             print(f"{PROG}: --save-union: {exc}", file=sys.stderr)
             return 1
-    summary = summarize(incidents, top_streets=args.top_streets)
+    summary = summarize(
+        incidents, top_streets=args.top_streets, neighborhoods=neighborhoods
+    )
     summary["inputs"] = [Path(p).name for p in args.archive] + ["GetContactCases"]
     summary["duplicates_skipped"] = duplicates
     summary["repeat_plates_count"] = len(plate_rows)
@@ -260,13 +278,47 @@ def _plates(args) -> tuple[list[dict], int]:
     return plate_rows, 0
 
 
+def _is_name(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _load_neighborhoods(path: str) -> dict[str, str]:
+    """Read a street -> neighborhood JSON object; ValueError on a bad shape."""
+    raw = Path(path).read_text(encoding="utf-8")
+    mapping = json.loads(raw)
+    if not isinstance(mapping, dict) or not all(
+        _is_name(street) and _is_name(area) for street, area in mapping.items()
+    ):
+        raise ValueError("invalid neighborhood mapping")
+    return mapping
+
+
+def _neighborhoods(args) -> tuple[dict[str, str] | None, int]:
+    """Shared --neighborhoods handling; returns (mapping, exit_code)."""
+    if args.neighborhoods is None:
+        return None, 0
+    try:
+        return _load_neighborhoods(args.neighborhoods), 0
+    except (OSError, UnicodeDecodeError):
+        message = NEIGHBORHOODS_UNREADABLE
+    except ValueError:  # json.JSONDecodeError is a ValueError
+        message = NEIGHBORHOODS_INVALID
+    print(f"{PROG}: {message}", file=sys.stderr)
+    return None, 1
+
+
 def _build(args) -> int:
     try:
         incidents, duplicates = load_incidents(args.inputs)
     except StatsError as exc:
         print(f"{PROG}: {exc}", file=sys.stderr)
         return 1
-    summary = summarize(incidents, top_streets=args.top_streets)
+    neighborhoods, code = _neighborhoods(args)
+    if code:
+        return code
+    summary = summarize(
+        incidents, top_streets=args.top_streets, neighborhoods=neighborhoods
+    )
     summary["inputs"] = [Path(p).name for p in args.inputs]
     summary["duplicates_skipped"] = duplicates
     plate_rows, code = _plates(args)
