@@ -15,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 from PIL import Image
@@ -53,8 +54,8 @@ class Out(io.StringIO):
 class FakeMunicipality:
     """Counts creations; a creation for a listed plate fails (uncertain)."""
 
-    created: list[str] = []
-    failing: set[str] = set()
+    created: ClassVar[list[str]] = []
+    failing: ClassVar[set[str]] = set()
 
     def __init__(self, credentials):
         pass
