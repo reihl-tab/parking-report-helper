@@ -283,10 +283,3 @@ Historical regression coverage: [batch 1 audit](docs/HISTORICAL-REGRESSIONS.md).
 CI test/coverage results appear in [GitHub job summaries](docs/CI-TEST-SUMMARIES.md).
 
 CI trigger overlap and runner-time measurements: [CI efficiency audit](docs/CI-EFFICIENCY.md) (measure-only, #124).
-
-## Givatayim adapter
-
-The fill-only Givatayim adapter moved to the separate
-[Givatayim municipal form repository](https://github.com/reihlinstinct/givatayim-106-adapter).
-It is independent of the Jerusalem reporting pipeline. Live headless use remains
-unverified; no Givatayim reports have been submitted by this adapter.

@@ -14,9 +14,3 @@ Flag, default, exit-code and JSON-key changes are recorded here, as required by 
 - Adopted the CLI flag-stability policy (#73). No flag, default or exit code changed.
 
 ## Unreleased
-
-- Add optional Givatayim resident form fill-only preview, with no-write session
-  guards, synthetic Chromium/WebKit tests and browser-test container (#274).
-  Live filing and receipt handling are not supported.
-
-- Move the Givatayim fill-only adapter to its own repository; keep only a README pointer here. No change to Jerusalem filing.
