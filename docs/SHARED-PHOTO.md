@@ -56,8 +56,9 @@ keys and no whitespace, and the bytes must be equal. Only the key order inside
 the object is ignored; every value must match.
 
 A reservation is refused, with the usual fixed blocked output and exit code,
-when the sibling folder or its `report.json` is missing, cannot be read or is
-not a JSON object, has no `shared_photo`, or carries a different or invalid
+when the sibling folder or its `report.json` is missing, is not a regular file
+(a FIFO or device is refused before any read, so the check never blocks; #284),
+cannot be read or is not a JSON object, has no `shared_photo`, or carries a different or invalid
 manifest. Both folders must therefore exist side by side before either car is
 submitted, and the sibling must stay in place for retries. Previews do not
 read the sibling.

@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -111,9 +113,18 @@ def sibling_record_path(folder: Path, manifest: dict[str, Any]) -> Path:
     return folder.parent / others[0] / "report.json"
 
 
+def _read_regular(path: Path) -> str:
+    """Read path only if it is a regular file; never block on a FIFO/device."""
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+    with os.fdopen(fd, "rb") as handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            raise OSError("not a regular file")
+        return handle.read().decode("utf-8")
+
+
 def _sibling_manifest(path: Path) -> Any:
     try:
-        record = json.loads(path.read_text(encoding="utf-8"))
+        record = json.loads(_read_regular(path))
     except (OSError, ValueError):
         raise ValueError(
             "Shared-photo sibling record is missing or unreadable"
