@@ -164,6 +164,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Run tests inside the image build
         run: docker build --target test .
+      - name: Run synthetic Givatayim Chromium and WebKit tests in container
+        run: |
+          docker build --target browser-test --tag parking-browser-test:ci .
+          id=$(docker create parking-browser-test:ci)
+          docker cp "$id:/app/browser-evidence" ./browser-evidence
+          docker rm "$id"
+      - name: Upload synthetic browser screenshots
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: givatayim-synthetic-browser-evidence
+          path: browser-evidence/
+          if-no-files-found: error
+          retention-days: 7
       - name: Build runtime image (not pushed)
         run: docker build --target runtime --tag parking-report-helper:ci .
       - name: Smoke test

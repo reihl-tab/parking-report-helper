@@ -12,3 +12,9 @@ Flag, default, exit-code and JSON-key changes are recorded here, as required by 
 - `parking-report-106`: after a successful submit, re-list today's cases and detect a server-side duplicate of the just-submitted text (#160). Duplicates exit with the new code 5 and print `duplicate_check: "duplicates_found"` plus `duplicate_case_numbers`; clean submissions print `duplicate_check: "single"` or `"pending"` and a failed check prints `"unavailable"` without failing the submission. New `api106.duplicate_case_numbers` helper. Minor version bump per the flag-stability policy.
 
 - Adopted the CLI flag-stability policy (#73). No flag, default or exit code changed.
+
+## Unreleased
+
+- Add optional Givatayim resident form fill-only preview, with no-write session
+  guards, synthetic Chromium/WebKit tests and browser-test container (#274).
+  Live filing and receipt handling are not supported.

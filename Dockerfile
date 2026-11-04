@@ -52,3 +52,13 @@ CMD []
 
 # Keep the default final image as the original core CLI.
 FROM runtime-base AS runtime
+
+# Optional synthetic browser tests, never contacts the municipality.
+FROM test AS browser-test
+RUN pip install --no-cache-dir playwright==1.64.1 && python -m playwright install --with-deps chromium webkit
+ENV PYTHONPATH=/app/tests \
+    GIVATAYIM_SCREENSHOTS=/app/browser-evidence
+RUN python -m unittest discover -s tests/browser -v
+
+# Preserve the default runtime image.
+FROM runtime-base AS default
