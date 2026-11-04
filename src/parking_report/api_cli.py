@@ -89,6 +89,12 @@ def prepare(
         from .followup import validate_followup
 
         fingerprint["followup"] = validate_followup(record["followup"])
+    if "shared_photo" in record:
+        from .shared_photo import member_manifest
+
+        # The member's own ID keeps each car's digest, state and receipt distinct.
+        manifest = member_manifest(record, folder.name, photo_hash)
+        fingerprint["shared_photo"] = dict(manifest, member=folder.name)
     canonical = json.dumps(fingerprint, ensure_ascii=False, sort_keys=True)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return contact, report, jpeg, digest
@@ -106,6 +112,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--approved-sha256", default="")
     p.add_argument("--retry-photo", action="store_true")
     p.add_argument("--approved-followup-sha256", default="")
+    p.add_argument("--approved-shared-photo-sha256", default="")
     p.add_argument(
         "--approved-category-routing",
         choices=("crosswalk_parking", "blocked_ramp"),
@@ -131,31 +138,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         photo_hash, _, _ = read_picture(args.folder / record_for_photo["photo"])
         followup = record_for_photo.get("followup")
-        if (
-            args.submit
-            and followup is not None
-            and (
-                args.approved_followup_sha256 != digest
-                or args.approved_sha256 != digest
-                or os.environ.get("PARKING_106_ENABLE_LIVE") != "true"
-            )
-        ):
-            raise ValueError(
-                "Follow-up needs explicit digest approval before reservation"
-            )
-        if args.approved_followup_sha256 and followup is None:
-            raise ValueError("Follow-up approval requires a manifest")
-        # Follow-up previews must not consume the single-child reservation.
-        reserve_ledger = ledger if args.submit or followup is None else None
+        shared = record_for_photo.get("shared_photo")
+        _approval_gate(
+            args, followup, args.approved_followup_sha256, digest, "Follow-up"
+        )
+        _approval_gate(
+            args, shared, args.approved_shared_photo_sha256, digest, "Shared photo"
+        )
+        # Follow-up and shared-photo previews must not consume a reservation.
+        exception = followup is not None or shared is not None
+        reserve_ledger = ledger if args.submit or not exception else None
         with reserve_ledger.locked() if reserve_ledger else nullcontext():
             entry = None
             if reserve_ledger:
-                entry = (
-                    reserve_ledger.reserve(
-                        report_id, digest, photo_hash, followup=followup
-                    )
-                    if followup is not None
-                    else reserve_ledger.reserve(report_id, digest, photo_hash)
+                entry = _reserve(
+                    reserve_ledger, args.folder, digest, photo_hash, followup, shared
                 )
             return execute(
                 args, contact, report, jpeg, digest, ledger, entry, report_id
@@ -165,6 +162,44 @@ def main(argv: Sequence[str] | None = None) -> int:
             '{"status":"blocked","note":"Check private input and ledger; no automatic retry."}'
         )
         return 4
+
+
+def _approval_gate(
+    args: Any, manifest: Any, approved: str, digest: str, name: str
+) -> None:
+    """A manifest is never permission: live use needs its own exact digest gate."""
+    if (
+        args.submit
+        and manifest is not None
+        and (
+            approved != digest
+            or args.approved_sha256 != digest
+            or os.environ.get("PARKING_106_ENABLE_LIVE") != "true"
+        )
+    ):
+        raise ValueError(f"{name} needs explicit digest approval before reservation")
+    if approved and manifest is None:
+        raise ValueError(f"{name} approval requires a manifest")
+
+
+def _reserve(
+    ledger: Any,
+    folder: Path,
+    digest: str,
+    photo_hash: str,
+    followup: Any,
+    shared: Any,
+) -> Any:
+    report_id = folder.name
+    if followup is not None:
+        return ledger.reserve(report_id, digest, photo_hash, followup=followup)
+    if shared is not None:
+        from .shared_photo import check_sibling
+
+        # Fail closed: the plate-free ledger cannot compare the two manifests.
+        check_sibling(folder, shared)
+        return ledger.reserve(report_id, digest, photo_hash, shared_photo=shared)
+    return ledger.reserve(report_id, digest, photo_hash)
 
 
 DUPLICATE_CHECK_DELAY_SECONDS = 20
