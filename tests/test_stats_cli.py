@@ -7,6 +7,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import ClassVar
 from unittest import mock
 
 from parking_report.stats_cli import run
@@ -277,7 +278,7 @@ if __name__ == "__main__":
 class RefreshCommandTest(unittest.TestCase):
     """`p106-stats refresh`: mocked fetch + archived export union (#232)."""
 
-    ENV = {
+    ENV: ClassVar[dict[str, str]] = {
         "PARKING_106_SUBSCRIPTION_KEY": "synthetic-key",
         "PARKING_106_USERNAME": "synthetic-user",
         "PARKING_106_PASSWORD": "synthetic-pass",

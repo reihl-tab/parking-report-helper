@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime as dt
 import types
 import unittest
+from typing import ClassVar
 from unittest import mock
 
 from parking_report import stats
@@ -135,7 +136,7 @@ class ByWeekYearBoundaryTest(unittest.TestCase):
 
 
 class ByMonthYearBoundaryTest(unittest.TestCase):
-    INCIDENTS = [
+    INCIDENTS: ClassVar[list[dict]] = [
         incident("2027-01-01T00:30:00"),
         incident("2026-12-31T23:30:00"),
         incident("2027-01-02T09:00:00"),

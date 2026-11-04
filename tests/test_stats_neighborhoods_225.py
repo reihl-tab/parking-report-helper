@@ -11,6 +11,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
+from typing import ClassVar
 from unittest import mock
 
 from parking_report.stats_cli import run
@@ -192,7 +193,7 @@ class InvalidMappingTest(unittest.TestCase):
 
 
 class RefreshNeighborhoodsTest(unittest.TestCase):
-    ENV = {
+    ENV: ClassVar[dict[str, str]] = {
         "PARKING_106_SUBSCRIPTION_KEY": "synthetic-key",
         "PARKING_106_USERNAME": "synthetic-user",
         "PARKING_106_PASSWORD": "synthetic-pass",
