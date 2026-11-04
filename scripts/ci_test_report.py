@@ -12,9 +12,10 @@ import sys
 import textwrap
 import unittest
 from pathlib import Path
+from typing import Any
 
 
-def safe_text(value):
+def safe_text(value: object) -> str:
     text = str(value).replace("\n", " ")[:500]
     text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[email]", text)
     text = re.sub(r"\b[0-9][0-9 -]{5,}[0-9]\b", "[number]", text)
@@ -261,155 +262,198 @@ def run_tests(start, output):
     return 0 if result.wasSuccessful() else 1
 
 
-def summary(metrics_path, coverage_path=None):
+_FIELDS = [
+    ("Tests run", "tests"),
+    ("Passed", "passed"),
+    ("Failures", "failures"),
+    ("Errors", "errors"),
+    ("Skipped", "skipped"),
+    ("Expected failures", "expected_failures"),
+    ("Unexpected successes", "unexpected_successes"),
+]
+_PRIORITY = {
+    "failed": 0,
+    "error": 1,
+    "unexpected success": 2,
+    "skipped": 3,
+    "expected failure": 4,
+    "passed": 5,
+}
+# Stands in for metrics that could not be read; it has no .get(), so the
+# per-test details step falls back to "unavailable" as for any non-mapping.
+_UNREAD = object()
+
+
+def _metrics_table(data: Any) -> list[str]:
+    """The aggregate table; raises ValueError/KeyError/TypeError when invalid."""
+    if any(type(data[key]) is not int or data[key] < 0 for _, key in _FIELDS):
+        raise ValueError("Invalid metrics")
+    if type(data["success"]) is not bool:
+        raise ValueError("Invalid success flag")
+    heading = "PASS" if data["success"] else "FAIL"
+    lines = [
+        "## Test results: " + heading,
+        "",
+        "| Metric | Count |",
+        "| --- | ---: |",
+    ]
+    lines.extend(f"| {title} | {data[key]} |" for title, key in _FIELDS)
+    return lines
+
+
+def _read_metrics(metrics_path: Any) -> tuple[Any, list[str]]:
+    """(parsed data or _UNREAD, aggregate lines); never raises on bad input."""
+    data = _UNREAD
     try:
         data = json.loads(Path(metrics_path).read_text())
-        fields = [
-            ("Tests run", "tests"),
-            ("Passed", "passed"),
-            ("Failures", "failures"),
-            ("Errors", "errors"),
-            ("Skipped", "skipped"),
-            ("Expected failures", "expected_failures"),
-            ("Unexpected successes", "unexpected_successes"),
-        ]
-        if any(type(data[key]) is not int or data[key] < 0 for _, key in fields):
-            raise ValueError("Invalid metrics")
-        if type(data["success"]) is not bool:
-            raise ValueError("Invalid success flag")
-        heading = "PASS" if data["success"] else "FAIL"
-        lines = [
-            "## Test results: " + heading,
-            "",
-            "| Metric | Count |",
-            "| --- | ---: |",
-        ]
-        lines.extend(f"| {title} | {data[key]} |" for title, key in fields)
+        lines = _metrics_table(data)
     except (OSError, ValueError, KeyError, TypeError):
         lines = [
             "## Test results: unavailable",
             "",
             "The test runner did not produce valid aggregate metrics. Check the job logs.",
         ]
-    coverage = None
-    if coverage_path:
-        try:
-            totals = json.loads(Path(coverage_path).read_text())["totals"]
-            value = totals["percent_covered"]
-            if type(value) in (int, float) and 0 <= value <= 100:
-                coverage = f"{value:.2f}% (coverage.py statement/branch measurement)"
-        except (OSError, ValueError, TypeError, KeyError):
-            pass
+    return data, lines
+
+
+def _coverage(coverage_path: Any) -> str | None:
+    if not coverage_path:
+        return None
+    try:
+        totals = json.loads(Path(coverage_path).read_text())["totals"]
+        value = totals["percent_covered"]
+        if type(value) in (int, float) and 0 <= value <= 100:
+            return f"{value:.2f}% (coverage.py statement/branch measurement)"
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    return None
+
+
+def _row_cells(row: Any) -> str:
+    # Data file is not an authority for HTML or unsafe runtime text.
+    values = [
+        safe_text(row.get(key, "")) for key in ("status", "test", "checks", "reason")
+    ]
+    return "| " + " | ".join(values) + " |"
+
+
+def _skip_lines(row: Any) -> list[str]:
+    context = row.get("skip_context", {})
+    return [
+        "Why skipped: " + safe_text(context.get("why", "Not recorded.")),
+        "",
+        "Where it runs instead: " + safe_text(context.get("where", "Not verified.")),
+        "",
+    ]
+
+
+def _plan_line(step: Any) -> str:
+    return (
+        "- Line "
+        + safe_text(step.get("line"))
+        + ": `"
+        + safe_text(step.get("call"))
+        + "` ("
+        + safe_text(", ".join(step.get("input_shapes", [])))
+        + ")."
+    )
+
+
+def _assertion_line(event: Any) -> str:
+    values = [
+        safe_text(event.get("assertion", "")),
+        safe_text(", ".join(event.get("inputs", []))),
+        safe_text(event.get("expected", "not captured")),
+        safe_text(event.get("actual", "not captured")),
+        safe_text(event.get("outcome", "")),
+    ]
+    return "| " + " | ".join(values) + " |"
+
+
+def _append_test_block(lines: list[str], row: Any) -> None:
+    """One test's collapsible block. Appends as it goes: on malformed data the
+    lines written so far stay and the caller adds the "unavailable" note."""
+    lines.extend(
+        [
+            "",
+            "<details>",
+            "<summary>"
+            + safe_text(row.get("status", ""))
+            + ": "
+            + safe_text(row.get("test", ""))
+            + "</summary>",
+            "",
+            "Source plan (static, branches may not execute; literal inputs withheld):",
+            "",
+        ]
+    )
+    if row.get("status") == "skipped":
+        lines.extend(_skip_lines(row))
+    for step in row.get("plan", []):
+        lines.append(_plan_line(step))
+    lines.extend(
+        [
+            "",
+            "Observed assertions (runtime values are privacy-filtered):",
+            "",
+            "| Assertion | Inputs | Expected | Actual | Observed outcome |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for event in row.get("assertions", []):
+        lines.append(_assertion_line(event))
+    if not row.get("assertions"):
+        lines.append(
+            "| None captured | | | | May use helpers, plain assert, skip or setup failure. See test status. |"
+        )
+    lines.extend(
+        [
+            "",
+            "Strings, objects and large numbers are withheld. Context-manager assertions are not claimed passed until the test completes.",
+            "",
+            "</details>",
+        ]
+    )
+
+
+def _append_details(lines: list[str], data: Any) -> None:
+    """Per-test table and blocks, appended in place (see _append_test_block)."""
+    details = data.get("details", [])
+    if not details:
+        return
+    lines.extend(
+        [
+            "",
+            "<details>",
+            "<summary>Per-test results (failures and skips first)</summary>",
+            "",
+            "| Status | Test | What it checks | Reason |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    rows = sorted(details, key=lambda row: _PRIORITY.get(row.get("status"), 9))
+    for row in rows:
+        lines.append(_row_cells(row))
+    lines.extend(
+        [
+            "",
+            "Expand an individual test for its structural plan and observed assertions.",
+        ]
+    )
+    for row in rows:
+        _append_test_block(lines, row)
+    lines.extend(["", "</details>"])
+
+
+def summary(metrics_path, coverage_path=None):
+    data, lines = _read_metrics(metrics_path)
+    coverage = _coverage(coverage_path)
     lines.extend(
         ["", "Coverage: " + (coverage or "not measured or unavailable in this job.")]
     )
     try:
-        details = data.get("details", [])
-        priority = {
-            "failed": 0,
-            "error": 1,
-            "unexpected success": 2,
-            "skipped": 3,
-            "expected failure": 4,
-            "passed": 5,
-        }
-        if details:
-            lines.extend(
-                [
-                    "",
-                    "<details>",
-                    "<summary>Per-test results (failures and skips first)</summary>",
-                    "",
-                    "| Status | Test | What it checks | Reason |",
-                    "| --- | --- | --- | --- |",
-                ]
-            )
-            for row in sorted(
-                details, key=lambda row: priority.get(row.get("status"), 9)
-            ):
-                # Data file is not an authority for HTML or unsafe runtime text.
-                values = [
-                    safe_text(row.get(key, ""))
-                    for key in ("status", "test", "checks", "reason")
-                ]
-                lines.append("| " + " | ".join(values) + " |")
-            lines.extend(
-                [
-                    "",
-                    "Expand an individual test for its structural plan and observed assertions.",
-                ]
-            )
-            for row in sorted(
-                details, key=lambda row: priority.get(row.get("status"), 9)
-            ):
-                lines.extend(
-                    [
-                        "",
-                        "<details>",
-                        "<summary>"
-                        + safe_text(row.get("status", ""))
-                        + ": "
-                        + safe_text(row.get("test", ""))
-                        + "</summary>",
-                        "",
-                        "Source plan (static, branches may not execute; literal inputs withheld):",
-                        "",
-                    ]
-                )
-                if row.get("status") == "skipped":
-                    context = row.get("skip_context", {})
-                    lines.extend(
-                        [
-                            "Why skipped: "
-                            + safe_text(context.get("why", "Not recorded.")),
-                            "",
-                            "Where it runs instead: "
-                            + safe_text(context.get("where", "Not verified.")),
-                            "",
-                        ]
-                    )
-                for step in row.get("plan", []):
-                    lines.append(
-                        "- Line "
-                        + safe_text(step.get("line"))
-                        + ": `"
-                        + safe_text(step.get("call"))
-                        + "` ("
-                        + safe_text(", ".join(step.get("input_shapes", [])))
-                        + ")."
-                    )
-                lines.extend(
-                    [
-                        "",
-                        "Observed assertions (runtime values are privacy-filtered):",
-                        "",
-                        "| Assertion | Inputs | Expected | Actual | Observed outcome |",
-                        "| --- | --- | --- | --- | --- |",
-                    ]
-                )
-                for event in row.get("assertions", []):
-                    values = [
-                        safe_text(event.get("assertion", "")),
-                        safe_text(", ".join(event.get("inputs", []))),
-                        safe_text(event.get("expected", "not captured")),
-                        safe_text(event.get("actual", "not captured")),
-                        safe_text(event.get("outcome", "")),
-                    ]
-                    lines.append("| " + " | ".join(values) + " |")
-                if not row.get("assertions"):
-                    lines.append(
-                        "| None captured | | | | May use helpers, plain assert, skip or setup failure. See test status. |"
-                    )
-                lines.extend(
-                    [
-                        "",
-                        "Strings, objects and large numbers are withheld. Context-manager assertions are not claimed passed until the test completes.",
-                        "",
-                        "</details>",
-                    ]
-                )
-            lines.extend(["", "</details>"])
-    except (UnboundLocalError, TypeError, AttributeError):
+        _append_details(lines, data)
+    except (TypeError, AttributeError):
         lines.extend(["", "Per-test details unavailable."])
     lines.extend(
         [
