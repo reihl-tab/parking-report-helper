@@ -246,3 +246,4 @@ flags, defaults, exit codes and JSON keys in the block above.
 
 Follow-ups that need their own PRs: `--json` for plain report output, and a
 shared exit-code table.
+Design for the remaining #73 work (proposal): [CLI-CONTRACT-DESIGN.md](CLI-CONTRACT-DESIGN.md).
