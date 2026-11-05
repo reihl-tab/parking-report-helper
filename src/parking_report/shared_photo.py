@@ -113,13 +113,18 @@ def sibling_record_path(folder: Path, manifest: dict[str, Any]) -> Path:
     return folder.parent / others[0] / "report.json"
 
 
-def _read_regular(path: Path) -> str:
+def _read_regular_bytes(path: Path) -> bytes:
     """Read path only if it is a regular file; never block on a FIFO/device."""
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
     with os.fdopen(fd, "rb") as handle:
         if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
             raise OSError("not a regular file")
-        return handle.read().decode("utf-8")
+        return handle.read()
+
+
+def _read_regular(path: Path) -> str:
+    """Text of a regular file; never blocks on a FIFO/device."""
+    return _read_regular_bytes(path).decode("utf-8")
 
 
 def _sibling_manifest(path: Path) -> Any:

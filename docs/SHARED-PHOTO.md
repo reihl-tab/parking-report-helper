@@ -79,4 +79,55 @@ The manifest proves only that the caller recorded an approval. The caller must
 independently verify the authority, that both cars are distinct and that the
 photo is the unchanged original, immediately before live use.
 
-For the proposed completed-intake extension, see [the design note](SHARED-PHOTO-EXTENSION-DESIGN.md) (not implemented).
+## Extension after a completed intake (#293)
+
+The manifest above covers two cars known *before* either reservation. One
+further, separately verified car may be reported later from the unchanged
+original photo of one **completed ordinary** vehicle intake, under the full
+contract in [the design note](SHARED-PHOTO-EXTENSION-DESIGN.md):
+
+- The new private record carries `shared_photo_extension` with exactly
+  `parent_id`, `parent_digest`, `photo_sha256`, `parent_plate`, `plate` and
+  `authority_reference`. The two plates are distinct and normalized; there is
+  no municipal case number in the manifest. All fields plus the new intake ID
+  enter the new preview digest, and live use needs
+  `--approved-extension-sha256` equal to that digest on top of every ordinary
+  gate. A record with both `followup` or `shared_photo` and an extension is
+  rejected. Extension previews reserve nothing.
+- The parent folder must sit beside the new folder, and its record is read
+  with the nonblocking regular-file reader (#284): missing, unreadable,
+  non-object or non-regular inputs are refused without hanging. Both original
+  photos must be byte-identical and carry the declared hash, and each record's
+  structured plate must match the manifest. Plates are never parsed from
+  prose.
+- The ledger parent entry is the source of truth for the submission digest,
+  and the preserved private submission artifacts must corroborate it: a
+  recorded `submission_digest` in the parent's report.json or the saved
+  submitted payload `municipal-payload.json`, plus a recompute of the original
+  payload through the preparation contract with the original photo and
+  reporter inputs (never printed or persisted). A saved digest string alone is
+  not sufficient; missing, changed or conflicting evidence makes the parent
+  ineligible. A municipal reference stays optional unverified metadata and
+  never selects the parent.
+- The parent must be complete, ordinary, and own the original photo index;
+  existing children, follow-ups or shared groups make it ineligible. The
+  parent entry and the photo index stay byte-for-byte unchanged.
+- The reservation stores a plate-free relation on the new entry (hashed
+  parent ID, parent digest, photo hash, authority reference) and, in the
+  optional private `photo_vehicle` index, one derived HMAC guard key per
+  (original photo, plate) plus a bounded slot allowing exactly one extension
+  per original photo. This is the single intentional private-index exception
+  to the rule that the ledger holds nothing derived from plates: the index
+  stores keyed hashes only, never raw plates, and nothing relaxes the rule for
+  any public output or diagnostic.
+- The index is initialized only by an explicit reviewed provisioning operation
+  with one key ID and its verification value (constant-time verified before
+  any reservation); a missing, invalid, unknown-key-ID or mismatched seed
+  fails closed, and there is no silent initialization or re-keying. The seed
+  is a private-environment secret supplied at runtime as `PARKING_GUARD_SEED`
+  (hex, at least 128 bits) with `PARKING_GUARD_KEY_ID`; seed provisioning is a
+  separate owner-approved step, never part of a submission.
+- Retries with the same intake and manifest resume the checkpoint and
+  recheck both private records; a changed relation, renamed intake, different
+  photo or second target fails closed. An uncertain new create blocks that
+  intake without automatic retry and never resubmits the parent.

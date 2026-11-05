@@ -9,9 +9,14 @@ import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from filelock import FileLock
+
+if TYPE_CHECKING:
+    from .vehicle_guard import GuardKey
+
+_HASH = r"[0-9a-f]{64}"
 
 
 class LedgerError(RuntimeError):
@@ -81,6 +86,8 @@ class GitLedger:
                 raise LedgerError("Corrupt private photo index")
             if not isinstance(self.data.get("shared_photos", {}), dict):
                 raise LedgerError("Corrupt private shared-photo index")
+            if not isinstance(self.data.get("photo_vehicle", {}), dict):
+                raise LedgerError("Corrupt private photo-vehicle guard index")
             yield self
 
     def persist(self) -> None:
@@ -108,40 +115,27 @@ class GitLedger:
         *,
         followup: dict[str, str] | None = None,
         shared_photo: dict[str, Any] | None = None,
+        extension: dict[str, str] | None = None,
+        guard: GuardKey | None = None,
     ) -> dict[str, Any]:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,119}", report_id):
             raise LedgerError("Stable intake ID must be an opaque folder name")
-        if any(
-            not re.fullmatch(r"[0-9a-f]{64}", value) for value in (digest, photo_hash)
-        ):
+        if any(not re.fullmatch(_HASH, value) for value in (digest, photo_hash)):
             raise LedgerError("Invalid payload/photo digest")
-        if followup is not None:
-            from .followup import validate_followup
-
-            followup = validate_followup(followup)
-        group = self._shared_group(followup, shared_photo)
+        followup, group, extension, relation = self._relations(
+            followup, shared_photo, extension, guard
+        )
         reports = self.data["reports"]
         key = hashlib.sha256(report_id.encode()).hexdigest()
         existing = reports.get(key)
         if existing:
-            if (
-                existing["digest"] != digest
-                or existing["photo_sha256"] != photo_hash
-                or existing.get("followup") != followup
-                or existing.get("shared_photo") != (group["group"] if group else None)
-            ):
+            if self._changed(existing, digest, photo_hash, followup, group, relation):
                 raise LedgerError(
                     "Existing intake ID has changed inputs; review without creating a new case"
                 )
             return existing
-        other = self.data["photos"].get(photo_hash)
-        if followup is not None:
-            self._check_parent(key, photo_hash, followup)
-        elif group is not None:
-            self._join_group(key, photo_hash, group)
-        elif other and other != key:
-            raise LedgerError("Original photo already belongs to another intake ID")
-        entry = {
+        self._bind(key, photo_hash, followup, group, extension, relation, guard)
+        entry: dict[str, Any] = {
             "digest": digest,
             "photo_sha256": photo_hash,
             "state": {"version": 1, "status": "prepared"},
@@ -150,12 +144,86 @@ class GitLedger:
             entry["followup"] = followup
         if group is not None:
             entry["shared_photo"] = group["group"]
+        if relation is not None:
+            entry["extension"] = relation
         reports[key] = entry
-        if followup is None:
+        if followup is None and relation is None:
             # A second group member keeps the first member as the photo's origin.
             self.data["photos"].setdefault(photo_hash, key)
         self.persist()
         return entry
+
+    def _relations(
+        self,
+        followup: dict[str, str] | None,
+        shared_photo: dict[str, Any] | None,
+        extension: dict[str, str] | None,
+        guard: GuardKey | None,
+    ) -> tuple[
+        dict[str, str] | None,
+        dict[str, Any] | None,
+        dict[str, str] | None,
+        dict[str, str] | None,
+    ]:
+        """Validate the optional relations and derive their ledger records."""
+        if followup is not None:
+            from .followup import validate_followup
+
+            followup = validate_followup(followup)
+        relation = None
+        if extension is not None:
+            from .shared_photo_extension import (
+                extension_relation,
+                validate_extension,
+            )
+
+            if followup is not None or shared_photo is not None:
+                raise LedgerError(
+                    "An extension cannot combine a follow-up or shared photo"
+                )
+            extension = validate_extension(extension)
+            relation = extension_relation(extension)
+        elif guard is not None:
+            raise LedgerError("A private guard key requires an extension manifest")
+        return followup, self._shared_group(followup, shared_photo), extension, relation
+
+    @staticmethod
+    def _changed(
+        existing: dict[str, Any],
+        digest: str,
+        photo_hash: str,
+        followup: dict[str, str] | None,
+        group: dict[str, Any] | None,
+        relation: dict[str, str] | None,
+    ) -> bool:
+        return (
+            existing["digest"] != digest
+            or existing["photo_sha256"] != photo_hash
+            or existing.get("followup") != followup
+            or existing.get("shared_photo") != (group["group"] if group else None)
+            or existing.get("extension") != relation
+        )
+
+    def _bind(
+        self,
+        key: str,
+        photo_hash: str,
+        followup: dict[str, str] | None,
+        group: dict[str, Any] | None,
+        extension: dict[str, str] | None,
+        relation: dict[str, str] | None,
+        guard: GuardKey | None,
+    ) -> None:
+        """Parent/group/extension binding checks for a new reservation."""
+        other = self.data["photos"].get(photo_hash)
+        if followup is not None:
+            self._check_parent(key, photo_hash, followup)
+        elif group is not None:
+            self._join_group(key, photo_hash, group)
+        elif relation is not None:
+            self._extend(key, photo_hash, extension, relation, guard)
+        elif other and other != key:
+            raise LedgerError("Original photo already belongs to another intake ID")
 
     @staticmethod
     def _shared_group(
@@ -220,6 +288,115 @@ class GitLedger:
             for e in reports.values()
         ):
             raise LedgerError("Parent already has a follow-up; reconcile it first")
+
+    def provision_guard_key(self, guard: GuardKey) -> None:
+        """Reviewed one-time provisioning of the private guard index (#293).
+
+        Initializes the optional index with exactly one key ID and its
+        verification value. Never called on a submission path; never
+        initializes opportunistically and never re-keys: a different key ID
+        or a mismatched verification value is refused. Rotation is a
+        separate reviewed migration, outside this feature.
+        """
+        metadata = guard.metadata()
+        index = self.data.get("photo_vehicle")
+        if index is None:
+            self.data["photo_vehicle"] = {
+                "key": metadata,
+                "guards": {},
+                "extensions": {},
+            }
+            self.persist()
+            return
+        if not isinstance(index, dict) or index.get("key") != metadata:
+            raise LedgerError("A different private guard key is already provisioned")
+        if not isinstance(index.get("guards"), dict) or not isinstance(
+            index.get("extensions"), dict
+        ):
+            raise LedgerError("Corrupt private photo-vehicle guard index")
+
+    def _guard_index(self, guard: GuardKey) -> dict[str, Any]:
+        """The provisioned private index, verified in constant time, or fail."""
+        from .vehicle_guard import GuardKeyError
+
+        index = self.data.get("photo_vehicle")
+        if not isinstance(index, dict) or not index:
+            raise LedgerError("Private photo-vehicle guard index is not provisioned")
+        try:
+            guard.verify(index.get("key"))
+        except GuardKeyError:
+            raise LedgerError("Private guard key verification failed") from None
+        guards = index.get("guards")
+        extensions = index.get("extensions")
+        if not isinstance(guards, dict) or not isinstance(extensions, dict):
+            raise LedgerError("Corrupt private photo-vehicle guard index")
+        for mapping in (guards, extensions):
+            if any(
+                re.fullmatch(_HASH, k) is None or re.fullmatch(_HASH, v) is None
+                for k, v in mapping.items()
+            ):
+                raise LedgerError("Corrupt private photo-vehicle guard index")
+        return index
+
+    def _extend(
+        self,
+        key: str,
+        photo_hash: str,
+        manifest: dict[str, str] | None,
+        relation: dict[str, str],
+        guard: GuardKey | None,
+    ) -> None:
+        """Bind one new intake to a completed ordinary parent (#293).
+
+        The parent entry and the original photo index stay byte-for-byte
+        unchanged; the child is exempt from the photo index's single-intake
+        refusal for this exact photo. One extension per original photo, and
+        one intake per (photo, plate) guard key under the provisioned key.
+        """
+        if guard is None or manifest is None:
+            raise LedgerError("Extension reservation needs the private guard key")
+        reports = self.data["reports"]
+        parent_key = relation["parent"]
+        parent = reports.get(parent_key)
+        if parent_key == key or not parent:
+            raise LedgerError("Extension parent is missing or self-referential")
+        expected = (manifest["parent_digest"], photo_hash, "complete")
+        actual = (
+            parent.get("digest"),
+            parent.get("photo_sha256"),
+            parent.get("state", {}).get("status"),
+        )
+        if actual != expected:
+            raise LedgerError("Extension needs the completed matching parent")
+        if any(k in parent for k in ("followup", "shared_photo", "extension")):
+            raise LedgerError("Extension parent is not an ordinary intake")
+        if self.data["photos"].get(photo_hash) != parent_key:
+            raise LedgerError("Extension parent does not own the original photo")
+        if any(
+            e.get("followup", {}).get("parent_id") == manifest["parent_id"]
+            for e in reports.values()
+        ):
+            raise LedgerError("Extension parent already has a follow-up")
+        if photo_hash in self.data.get("shared_photos", {}):
+            raise LedgerError("Extension parent belongs to a shared-photo group")
+        index = self._guard_index(guard)
+        from .vehicle_guard import GuardKeyError
+
+        try:
+            derived = guard.identity(photo_hash, manifest["plate"])
+        except GuardKeyError:
+            raise LedgerError("Private guard identity inputs are invalid") from None
+        guards = index["guards"]
+        extensions = index["extensions"]
+        holder = guards.get(derived)
+        if holder is not None and holder != key:
+            raise LedgerError("This plate is already guarded for the original photo")
+        if holder == key or extensions.get(photo_hash) == key:
+            raise LedgerError("Private guard index is inconsistent; reconcile first")
+        if extensions.get(photo_hash) is not None:
+            raise LedgerError("The original photo already has one extension")
+        guards[derived] = key
+        extensions[photo_hash] = key
 
     def checkpoint(self, report_id: str, state: dict[str, Any]) -> None:
         key = hashlib.sha256(report_id.encode()).hexdigest()

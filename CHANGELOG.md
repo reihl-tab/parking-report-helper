@@ -3,6 +3,10 @@
 Flag, default, exit-code and JSON-key changes are recorded here, as required by the
 [flag-stability policy](docs/CLI-CONTRACT.md#flag-stability-policy).
 
+## Unreleased (planned 0.6.0)
+
+- `parking-report-106`: add the controlled shared-photo extension and the `--approved-extension-sha256` gate (#293, [design](docs/SHARED-PHOTO-EXTENSION-DESIGN.md), [docs](docs/SHARED-PHOTO.md)). One explicitly approved, separately verified car may be reported from the unchanged original photo of one completed ordinary vehicle intake. The parent's payload digest is corroborated against preserved private submission artifacts and a recompute of the original inputs; a provisioned private HMAC guard index (seed supplied only at runtime via `PARKING_GUARD_SEED`/`PARKING_GUARD_KEY_ID`) blocks the same plate under the same original, and a bounded private index allows exactly one extension per original. Parent entries and the original photo index stay byte-for-byte unchanged; the ledger relation stays plate-free; derived guard keys live only in the private index. Additive; minor version bump per the flag-stability policy.
+
 ## Unreleased (planned 0.5.0)
 
 - `p106-stats build` and `refresh`: new optional `--neighborhoods PATH` (#225, [contract notes](docs/CLI-CONTRACT.md#notes-on-current-behaviour)). `PATH` is a UTF-8 JSON object mapping street name to neighborhood name; it fills `by_neighborhood` in `summary.json` (unmapped streets count as `(אחר)`) and adds the neighborhood chart to `report.html`. An unreadable or invalid file exits 1 with a fixed message that never includes the path or the file's contents. Without the flag `by_neighborhood` stays `null` and the output is unchanged. Additive; covered by the unreleased 0.5.0 minor bump, so no further version change.

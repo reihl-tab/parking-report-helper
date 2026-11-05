@@ -75,6 +75,9 @@ OPTION_NOTES: dict[str, dict[str, str]] = {
         "--approved-shared-photo-sha256": "digest approval for a shared-photo "
         "manifest (two distinct cars in one original photo); must equal the "
         "reviewed digest.",
+        "--approved-extension-sha256": "digest approval for a shared-photo "
+        "extension (one new car in a completed intake's unchanged original "
+        "photo); must equal the reviewed digest.",
     },
 }
 

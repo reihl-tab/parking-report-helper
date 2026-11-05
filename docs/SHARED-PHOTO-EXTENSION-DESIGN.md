@@ -1,7 +1,7 @@
 # Shared photo extension after a completed intake
 
 - Issue: #293
-- Status: proposal, pending owner sign-off
+- Status: approved by the owner; implemented (guard identity as selected by the owner)
 - Date: 2026-11-05
 - Base measured: main `efda4ca3ca87e3002fea0eddba46b844114a157b` (reviewed baseline #294)
 

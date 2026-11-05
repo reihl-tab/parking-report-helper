@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import time
 from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
@@ -95,6 +96,12 @@ def prepare(
         # The member's own ID keeps each car's digest, state and receipt distinct.
         manifest = member_manifest(record, folder.name, photo_hash)
         fingerprint["shared_photo"] = dict(manifest, member=folder.name)
+    if "shared_photo_extension" in record:
+        from .shared_photo_extension import extension_manifest
+
+        # Every manifest field plus the new intake ID enters the preview digest.
+        extension = extension_manifest(record, folder.name, photo_hash)
+        fingerprint["shared_photo_extension"] = dict(extension, member=folder.name)
     canonical = json.dumps(fingerprint, ensure_ascii=False, sort_keys=True)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return contact, report, jpeg, digest
@@ -113,6 +120,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--retry-photo", action="store_true")
     p.add_argument("--approved-followup-sha256", default="")
     p.add_argument("--approved-shared-photo-sha256", default="")
+    p.add_argument("--approved-extension-sha256", default="")
     p.add_argument(
         "--approved-category-routing",
         choices=("crosswalk_parking", "blocked_ramp"),
@@ -121,9 +129,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = p.parse_args(argv)
     try:
-        contact, report, jpeg, digest = prepare(
-            args.folder, args.addresses, private_values(os.environ)
-        )
+        reporter = private_values(os.environ)
+        contact, report, jpeg, digest = prepare(args.folder, args.addresses, reporter)
         from .ledger import GitLedger
 
         ledger = GitLedger(args.ledger_dir) if args.ledger_dir else None
@@ -139,20 +146,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         photo_hash, _, _ = read_picture(args.folder / record_for_photo["photo"])
         followup = record_for_photo.get("followup")
         shared = record_for_photo.get("shared_photo")
+        extension = record_for_photo.get("shared_photo_extension")
         _approval_gate(
             args, followup, args.approved_followup_sha256, digest, "Follow-up"
         )
         _approval_gate(
             args, shared, args.approved_shared_photo_sha256, digest, "Shared photo"
         )
-        # Follow-up and shared-photo previews must not consume a reservation.
-        exception = followup is not None or shared is not None
+        _approval_gate(
+            args, extension, args.approved_extension_sha256, digest, "Extension"
+        )
+        # Follow-up, shared-photo and extension previews reserve nothing.
+        exception = followup is not None or shared is not None or extension is not None
         reserve_ledger = ledger if args.submit or not exception else None
         with reserve_ledger.locked() if reserve_ledger else nullcontext():
             entry = None
             if reserve_ledger:
                 entry = _reserve(
-                    reserve_ledger, args.folder, digest, photo_hash, followup, shared
+                    reserve_ledger,
+                    args.folder,
+                    record_for_photo,
+                    digest,
+                    photo_hash,
+                    followup,
+                    shared,
+                    extension,
+                    args.addresses,
+                    reporter,
                 )
             return execute(
                 args, contact, report, jpeg, digest, ledger, entry, report_id
@@ -182,13 +202,32 @@ def _approval_gate(
         raise ValueError(f"{name} approval requires a manifest")
 
 
+def _guard_key(env: Mapping[str, str]) -> Any:
+    """The runtime-only private guard key from the private environment (#293).
+
+    The seed is a GitHub Actions Secret in the private reports environment,
+    supplied only at runtime as hex of at least 16 bytes; it is never a
+    GitHub Variable, never logged and never provisioned here.
+    """
+    from .vehicle_guard import GuardKey
+
+    seed_text = env.get("PARKING_GUARD_SEED", "")
+    if re.fullmatch(r"(?:[0-9a-f]{2}){16,}", seed_text) is None:
+        raise ValueError("Private guard seed is missing or invalid")
+    return GuardKey(env.get("PARKING_GUARD_KEY_ID", ""), bytes.fromhex(seed_text))
+
+
 def _reserve(
     ledger: Any,
     folder: Path,
+    record: Any,
     digest: str,
     photo_hash: str,
     followup: Any,
     shared: Any,
+    extension: Any = None,
+    addresses: Any = None,
+    reporter: Any = None,
 ) -> Any:
     report_id = folder.name
     if followup is not None:
@@ -199,6 +238,17 @@ def _reserve(
         # Fail closed: the plate-free ledger cannot compare the two manifests.
         check_sibling(folder, shared)
         return ledger.reserve(report_id, digest, photo_hash, shared_photo=shared)
+    if extension is not None:
+        from .shared_photo_extension import corroborate_parent
+
+        # Fail closed: parent artifacts corroborate the ledger digest, and the
+        # provisioned guard index is verified, before any reservation. Every
+        # retry rechecks both private records.
+        guard = _guard_key(os.environ)
+        corroborate_parent(folder, record, extension, ledger.data, addresses, reporter)
+        return ledger.reserve(
+            report_id, digest, photo_hash, extension=extension, guard=guard
+        )
     return ledger.reserve(report_id, digest, photo_hash)
 
 
