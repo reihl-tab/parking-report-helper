@@ -10,6 +10,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from synthetic_contact import SYNTHETIC_ID, SYNTHETIC_PHONE
+
 try:
     from parking_report import api106
 except ImportError:
@@ -131,8 +133,8 @@ class ProtocolTests(unittest.TestCase):
                 os.environ,
                 PARKING_REPORTER_FIRST_NAME="שם",
                 PARKING_REPORTER_LAST_NAME="לדוגמה",
-                PARKING_REPORTER_PHONE="0500000000",
-                PARKING_REPORTER_ID_NUMBER="000000018",
+                PARKING_REPORTER_PHONE=SYNTHETIC_PHONE,
+                PARKING_REPORTER_ID_NUMBER=SYNTHETIC_ID,
                 PARKING_REPORTER_EMAIL="example@example.invalid",
             )
             cmd = [
@@ -149,7 +151,7 @@ class ProtocolTests(unittest.TestCase):
             self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
             data = json.loads(out.stdout)
             self.assertEqual(data["network_requests"], 0)
-            self.assertNotIn("000000018", out.stdout)
+            self.assertNotIn(SYNTHETIC_ID, out.stdout)
             self.assertFalse((folder / ".106-state").exists())
             out = subprocess.run(
                 cmd + ["--submit", "--approved-sha256", data["sha256"]],

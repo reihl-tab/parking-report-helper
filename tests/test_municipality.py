@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from synthetic_contact import SYNTHETIC_PHONE
+
 from parking_report.municipality import (
     MISSING,
     build_submission,
@@ -22,7 +24,7 @@ REPORTER = {
     "last_name": "B",
     "id_type": "תעודת זהות",
     "id_number": "000000000",
-    "phone": "0500000000",
+    "phone": SYNTHETIC_PHONE,
     "email": "a@example.com",
 }
 

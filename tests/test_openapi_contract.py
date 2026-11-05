@@ -20,7 +20,7 @@ SPEC_PATH = ROOT / "docs" / "openapi.json"
 # The installed module, not src/: the Docker test stage has no src tree.
 SOURCE_PATH = Path(http_service.__file__)
 
-TOKEN = "synthetic-only-token-0000000000000000"
+TOKEN = "synthetic-only-token-abcdefghijklmnop"
 ENV = {
     "PARKING_HTTP_TOKEN": TOKEN,
     "PARKING_106_SUBSCRIPTION_KEY": "fake-key",

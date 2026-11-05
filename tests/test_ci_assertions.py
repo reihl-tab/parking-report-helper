@@ -22,7 +22,7 @@ class T(unittest.TestCase):
  def test_pass(self):
   self.assertEqual(2+2,4)
   self.assertTrue(True)
-  self.assertEqual('SECRET_EMAIL_person@example.test','SECRET_EMAIL_person@example.test')
+  self.assertEqual('SECRET_EMAIL_person@example.invalid','SECRET_EMAIL_person@example.invalid')
  def test_fail(self): self.assertEqual(3,4)
  def test_context(self):
   with self.assertRaises(ValueError): raise ValueError('SECRET_RUNTIME')

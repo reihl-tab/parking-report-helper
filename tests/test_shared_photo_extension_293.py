@@ -21,6 +21,7 @@ from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 from PIL import Image
+from synthetic_contact import SYNTHETIC_ID, SYNTHETIC_PHONE
 
 from parking_report import api_cli
 from parking_report.ledger import GitLedger, LedgerError
@@ -37,8 +38,8 @@ from parking_report.vehicle_guard import GuardKey
 ENV = {
     "PARKING_REPORTER_FIRST_NAME": "דנה",
     "PARKING_REPORTER_LAST_NAME": "לוי",
-    "PARKING_REPORTER_PHONE": "0500000000",
-    "PARKING_REPORTER_ID_NUMBER": "000000018",
+    "PARKING_REPORTER_PHONE": SYNTHETIC_PHONE,
+    "PARKING_REPORTER_ID_NUMBER": SYNTHETIC_ID,
     "PARKING_REPORTER_EMAIL": "dana@example.com",
 }
 SEED = bytes(range(32))  # Synthetic, deterministic test secret only.
@@ -860,8 +861,8 @@ class NonRegularParentTests(ExtensionBase):
 REPORTER_ENV = {
     "first_name": "דנה",
     "last_name": "לוי",
-    "phone": "0500000000",
-    "id_number": "000000018",
+    "phone": SYNTHETIC_PHONE,
+    "id_number": SYNTHETIC_ID,
     "email": "dana@example.com",
 }
 

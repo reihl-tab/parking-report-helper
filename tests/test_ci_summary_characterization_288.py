@@ -56,7 +56,7 @@ ROWS = [
         "status": "failed",
         "test": "test_beta.BetaTests.test_markup",
         "checks": "<b>Escapes</b> | pipes",
-        "reason": "AssertionError for user@example.test at /tmp/x token=abc 1234 5678",
+        "reason": "AssertionError for user@example.invalid at /tmp/x token=abc 1234 5678",
         "plan": [
             {"line": 3, "call": "assertIn", "input_shapes": []},
             {"line": 4, "call": "assertTrue"},

@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from synthetic_contact import SYNTHETIC_ID, SYNTHETIC_PHONE
+
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SAMPLE = ROOT / "sample.json"
@@ -15,8 +17,8 @@ REPORTER = {
     "first_name": "דנה",
     "last_name": "לוי",
     "id_type": "תעודת זהות",
-    "id_number": "000000018",
-    "phone": "0500000000",
+    "id_number": SYNTHETIC_ID,
+    "phone": SYNTHETIC_PHONE,
     "email": "dana@example.com",
 }
 

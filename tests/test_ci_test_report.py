@@ -162,11 +162,11 @@ class Synthetic(unittest.TestCase):
 
     def test_per_test_reasons_redacted_and_markup_escaped(self):
         text = c.safe_text(
-            "<script>alert(1)</script> plate 12345678 user@example.test token=abc123 /private/photo.jpg"
+            "<script>alert(1)</script> plate 12345678 user@example.invalid token=abc123 /private/photo.jpg"
         )
         self.assertNotIn("<script>", text)
         self.assertNotIn("12345678", text)
-        self.assertNotIn("user@example.test", text)
+        self.assertNotIn("user@example.invalid", text)
         self.assertNotIn("abc123", text)
         self.assertNotIn("/private/photo.jpg", text)
         self.assertEqual(
