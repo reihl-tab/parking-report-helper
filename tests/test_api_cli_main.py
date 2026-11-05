@@ -11,14 +11,15 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from PIL import Image
+from synthetic_contact import SYNTHETIC_ID, SYNTHETIC_PHONE
 
 from parking_report import api_cli
 
 ENV = {
     "PARKING_REPORTER_FIRST_NAME": "דנה",
     "PARKING_REPORTER_LAST_NAME": "לוי",
-    "PARKING_REPORTER_PHONE": "0500000000",
-    "PARKING_REPORTER_ID_NUMBER": "000000018",
+    "PARKING_REPORTER_PHONE": SYNTHETIC_PHONE,
+    "PARKING_REPORTER_ID_NUMBER": SYNTHETIC_ID,
     "PARKING_REPORTER_EMAIL": "dana@example.com",
 }
 

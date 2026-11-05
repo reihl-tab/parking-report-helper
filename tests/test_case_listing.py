@@ -7,13 +7,15 @@ import unittest
 import urllib.error
 from unittest.mock import patch
 
+from synthetic_contact import SYNTHETIC_ID
+
 from parking_report.api106 import APIError, InputError, Municipality, NoRedirect
 
 CREDS = {
     "subscription_key": "synthetic-key",
     "login": {"UserName": "test", "Password": "test"},
 }
-REPORTER = {"ContactIdType": "100000000", "ContactIdNumber": "000000018"}
+REPORTER = {"ContactIdType": "100000000", "ContactIdNumber": SYNTHETIC_ID}
 TOKEN = "synthetic/token?secret=1"
 
 
@@ -66,7 +68,7 @@ class CaseListingTests(unittest.TestCase):
         self.assertIsNone(request.data)
         self.assertTrue(
             request.full_url.endswith(
-                "/GetContactCases/synthetic%2Ftoken%3Fsecret%3D1/100000000/000000018?from=2026-01-01&caseType=2"
+                f"/GetContactCases/synthetic%2Ftoken%3Fsecret%3D1/100000000/{SYNTHETIC_ID}?from=2026-01-01&caseType=2"
             )
         )
         self.assertEqual(timeout, 45)

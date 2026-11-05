@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from support import REPORTER, SAMPLE, run_cli
+from synthetic_contact import SYNTHETIC_ID
 
 FIRST_REPORT = (
     "שלום, אני מדווח על רכב שחונה על המדרכה וחוסם אותה למעבר הולכי רגל. "
@@ -60,7 +61,7 @@ class TestMunicipalityOutput(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         first = json.loads(result.stdout)[0]
         self.assertEqual(first["first_name"], "דנה")
-        self.assertEqual(first["id_number"], "000000018")
+        self.assertEqual(first["id_number"], SYNTHETIC_ID)
         self.assertEqual(first["city"], "ירושלים")
         self.assertEqual(first["street"], "הדוגמה")
         self.assertEqual(first["house_number"], "1")

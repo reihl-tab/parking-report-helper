@@ -10,6 +10,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from synthetic_contact import SYNTHETIC_ID, SYNTHETIC_PHONE
+
 from parking_report.api_cli import execute, prepare
 from parking_report.intake import record_to_car
 from parking_report.report import build_report
@@ -138,8 +140,8 @@ class SubjectTests(unittest.TestCase):
                     for k, v in {
                         "first_name": "שם",
                         "last_name": "לדוגמה",
-                        "phone": "0500000000",
-                        "id_number": "000000018",
+                        "phone": SYNTHETIC_PHONE,
+                        "id_number": SYNTHETIC_ID,
                         "email": "example@example.invalid",
                     }.items()
                 },

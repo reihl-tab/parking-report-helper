@@ -20,14 +20,15 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from PIL import Image
+from synthetic_contact import SYNTHETIC_ID, SYNTHETIC_PHONE
 
 from parking_report import api106, api_cli
 
 ENV = {
     "PARKING_REPORTER_FIRST_NAME": "דנה",
     "PARKING_REPORTER_LAST_NAME": "לוי",
-    "PARKING_REPORTER_PHONE": "0500000000",
-    "PARKING_REPORTER_ID_NUMBER": "000000018",
+    "PARKING_REPORTER_PHONE": SYNTHETIC_PHONE,
+    "PARKING_REPORTER_ID_NUMBER": SYNTHETIC_ID,
     "PARKING_REPORTER_EMAIL": "dana@example.com",
     "PARKING_106_ENABLE_LIVE": "true",
 }
@@ -255,7 +256,7 @@ class PostSubmitDuplicateCheckTests(unittest.TestCase):
         delays = []
         numbers = api_cli.post_submit_duplicate_check(
             FakeMunicipality(incidents),
-            {"ContactIdNumber": "000000018", "ContactIdType": "100000000"},
+            {"ContactIdNumber": SYNTHETIC_ID, "ContactIdType": "100000000"},
             DESCRIPTION,
             sleep=delays.append,
             today="2026-10-29",
@@ -285,7 +286,7 @@ class PostSubmitDuplicateCheckTests(unittest.TestCase):
         with patch("parking_report.api_cli.datetime", FakeDatetime):
             api_cli.post_submit_duplicate_check(
                 api,
-                {"ContactIdNumber": "000000018", "ContactIdType": "100000000"},
+                {"ContactIdNumber": SYNTHETIC_ID, "ContactIdType": "100000000"},
                 DESCRIPTION,
                 sleep=lambda _seconds: None,
                 today=None,
@@ -298,7 +299,7 @@ class PostSubmitDuplicateCheckTests(unittest.TestCase):
     def test_verification_failure_returns_none(self):
         numbers = api_cli.post_submit_duplicate_check(
             FakeMunicipality(error=ConnectionError("down")),
-            {"ContactIdNumber": "000000018", "ContactIdType": "100000000"},
+            {"ContactIdNumber": SYNTHETIC_ID, "ContactIdType": "100000000"},
             DESCRIPTION,
             sleep=lambda _seconds: None,
             today="2026-10-29",

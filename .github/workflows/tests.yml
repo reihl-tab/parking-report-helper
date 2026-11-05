@@ -174,7 +174,7 @@ jobs:
       - name: Build Render HTTP image and smoke-test health without API credentials
         run: |
           docker build -f Dockerfile.render -t parking-http:ci .
-          docker run -d --name parking-http -p 127.0.0.1:10000:10000 -e PARKING_HTTP_TOKEN=synthetic-ci-token-0000000000000000 parking-http:ci
+          docker run -d --name parking-http -p 127.0.0.1:10000:10000 -e PARKING_HTTP_TOKEN=synthetic-ci-token-abcdefghijklmnop parking-http:ci
           trap 'docker rm -f parking-http' EXIT
           python - <<'PY'
           import json, time, urllib.request

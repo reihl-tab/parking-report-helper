@@ -11,7 +11,7 @@ from wsgiref.simple_server import make_server
 from parking_report.api106 import APIError
 from parking_report.http_service import QuietHandler, Service
 
-TOKEN = "synthetic-only-token-0000000000000000"
+TOKEN = "synthetic-only-token-abcdefghijklmnop"
 ENV = {
     "PARKING_HTTP_TOKEN": TOKEN,
     "PARKING_106_SUBSCRIPTION_KEY": "fake-key",
