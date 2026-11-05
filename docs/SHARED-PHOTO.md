@@ -78,3 +78,5 @@ duplicate photos remain blocked exactly as before.
 The manifest proves only that the caller recorded an approval. The caller must
 independently verify the authority, that both cars are distinct and that the
 photo is the unchanged original, immediately before live use.
+
+For the proposed completed-intake extension, see [the design note](SHARED-PHOTO-EXTENSION-DESIGN.md) (not implemented).
