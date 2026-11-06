@@ -3,7 +3,7 @@
 import argparse
 import unittest
 
-from synthetic_contact import SYNTHETIC_ID, SYNTHETIC_PHONE
+from synthetic_contact import SYNTHETIC_ID, SYNTHETIC_LANDLINE, SYNTHETIC_PHONE
 
 from parking_report.api106 import InputError, make_contact
 
@@ -34,3 +34,17 @@ class SyntheticContactTests(unittest.TestCase):
     def test_reserved_international_shape_still_rejected(self):
         with self.assertRaises(InputError):
             make_contact(self.args(phone="+999" + "0" * 8))
+
+    def test_landline_shaped_phone_rejected(self):
+        # Kills the widening of the mobile-only shape to any ten-digit 0 number.
+        self.assertEqual(len(SYNTHETIC_LANDLINE), 10)
+        self.assertEqual(SYNTHETIC_LANDLINE[0], "0")
+        self.assertNotEqual(SYNTHETIC_LANDLINE[1], "5")
+        forms = {
+            "domestic": SYNTHETIC_LANDLINE,
+            "international": "+972" + SYNTHETIC_LANDLINE[1:],
+        }
+        for form, phone in forms.items():
+            with self.subTest(form=form):
+                with self.assertRaisesRegex(InputError, "mobile number"):
+                    make_contact(self.args(phone=phone))
