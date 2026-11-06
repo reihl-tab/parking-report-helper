@@ -8,3 +8,5 @@ with a live transport or put their evaluated values into public examples.
 
 SYNTHETIC_PHONE = "05" + "0" * 8
 SYNTHETIC_ID = "0" * 7 + str(18)
+# Landline-shaped (0 + a non-mobile area digit + 8 digits); production must reject it.
+SYNTHETIC_LANDLINE = "0" + str(2) + "0" * 8
