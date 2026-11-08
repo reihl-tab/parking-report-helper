@@ -2,9 +2,15 @@
 FROM python:3.13-slim@sha256:2d44738ebf4ce5f63b9d9ea871e9c7cfdc0426f7b0c97cac915fd88ded1d86bb
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
+# Hash-locked installs only (#177): build prerequisites and the api extra from
+# the locks, then the project itself with --no-deps --no-build-isolation.
+COPY requirements/build.txt requirements/api.txt ./requirements/
+RUN pip install --no-cache-dir --require-hashes \
+    -r requirements/build.txt -r requirements/api.txt
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir ".[api]" && useradd --create-home --uid 10001 app
+RUN pip install --no-cache-dir --no-deps --no-build-isolation . \
+    && useradd --create-home --uid 10001 app
 USER app
 EXPOSE 10000
 ENTRYPOINT ["parking-report-http"]

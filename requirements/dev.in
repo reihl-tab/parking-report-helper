@@ -1,0 +1,3 @@
+# Local-only tool for the hooks in .pre-commit-config.yaml. Compiled with
+# requirements/api.txt and requirements/ci.txt as constraints.
+pre-commit

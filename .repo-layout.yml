@@ -50,6 +50,13 @@
         "*.1"
       ]
     },
+    "requirements": {
+      "allow": [
+        "*.in",
+        "*.json",
+        "*.txt"
+      ]
+    },
     "scripts": {
       "allow": [
         "*.py"
