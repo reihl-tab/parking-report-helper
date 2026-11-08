@@ -40,6 +40,62 @@ def load_contract(text: str | None = None) -> dict:
     return json.loads(match.group(1))
 
 
+EXIT_TABLE = re.compile(
+    r"<!-- exit-code-table:begin -->\n(.*?)\n<!-- exit-code-table:end -->", re.DOTALL
+)
+UNUSED = "\u2014"  # an em dash: the command never exits with this code
+
+
+def _cells(row: str) -> list[str]:
+    return [cell.strip() for cell in row.strip().strip("|").split("|")]
+
+
+def exit_code_table_problems(text: str) -> list[str]:
+    """Differences between the human exit-code table and the block's exit_codes.
+
+    The table has one row per code and one column per command, in block order.
+    A cell is either the em dash (the command never uses that code) or a
+    short meaning (it does). An empty list means the table matches.
+    """
+    match = EXIT_TABLE.search(text)
+    if not match:
+        return ["exit-code table missing from docs/CLI-CONTRACT.md"]
+    commands = load_contract(text)["commands"]
+    rows = [line for line in match.group(1).splitlines() if line.startswith("|")]
+    if len(rows) < 3:
+        return ["exit-code table has no rows"]
+    header = _cells(rows[0])
+    names = [name.strip("`") for name in header[2:]]
+    problems = []
+    if header[:2] != ["Code", "Shared meaning"] or names != list(commands):
+        problems.append(f"header {header} does not list the block's commands")
+    codes: list[str] = []
+    used: dict[str, set[str]] = {name: set() for name in names}
+    for row in rows[2:]:
+        cells = _cells(row)
+        if len(cells) != len(header) or not all(cells):
+            problems.append(f"malformed row {row!r}")
+            continue
+        code = cells[0].strip("`")
+        codes.append(code)
+        for name, cell in zip(names, cells[2:]):
+            if cell != UNUSED:
+                used[name].add(code)
+    if not all(code.isdigit() for code in codes):
+        problems.append(f"non-numeric code in {codes}")
+    elif codes != sorted(set(codes), key=int):
+        problems.append(f"codes {codes} are not unique and ascending")
+    expected = {name: set(spec["exit_codes"]) for name, spec in commands.items()}
+    if used != expected:
+        problems.append(f"table {used} != block {expected}")
+    every_code = set().union(*expected.values())
+    if set(codes) != every_code:
+        problems.append(
+            f"table codes {sorted(codes)} != block codes {sorted(every_code)}"
+        )
+    return problems
+
+
 class _Captured(Exception):
     def __init__(self, parser: argparse.ArgumentParser) -> None:
         self.parser = parser
@@ -400,6 +456,103 @@ class PolicyDocTest(unittest.TestCase):
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         self.assertIn("docs/CLI-CONTRACT.md#flag-stability-policy", changelog)
         self.assertIn("## Unreleased", changelog)
+
+    @unittest.skipUnless(
+        (ROOT / "CHANGELOG.md").exists(),
+        "source checkout only; the Docker test stage copies docs/ but not CHANGELOG.md",
+    )
+    def test_changelog_has_no_empty_section(self) -> None:
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        sections = re.split(r"^## .*$", changelog, flags=re.MULTILINE)[1:]
+        for heading, body in zip(
+            re.findall(r"^## .*$", changelog, flags=re.MULTILINE), sections
+        ):
+            with self.subTest(heading):
+                self.assertTrue(body.strip(), f"empty CHANGELOG section {heading!r}")
+
+
+class ExitCodeTableTest(unittest.TestCase):
+    """The shared exit-code table is documentation of the block (#73, PR 1)."""
+
+    def setUp(self) -> None:
+        self.text = DOC.read_text(encoding="utf-8")
+
+    def test_exit_code_table_matches_block_exit_codes(self) -> None:
+        self.assertEqual(exit_code_table_problems(self.text), [])
+
+    def test_exit_code_table_check_detects_drift(self) -> None:
+        table = EXIT_TABLE.search(self.text)
+        self.assertIsNotNone(table)
+        assert table is not None
+        body = table.group(1)
+        rows = body.splitlines()
+        row_5 = next(row for row in rows if row.startswith("| `5` |"))
+        cells = _cells(row_5)
+        cells[3] = UNUSED  # the parking-report-106 column
+        cleared = "| " + " | ".join(cells) + " |"
+        bogus = "| `3` | Synthetic | x | " + " | ".join([UNUSED] * 3) + " |"
+        block = load_contract(self.text)
+        block["commands"]["p106-stats"]["exit_codes"]["4"] = "synthetic"
+        mutants = {
+            "code changed in the table": self.text.replace("| `4` |", "| `3` |", 1),
+            "row dropped": self.text.replace(row_5 + "\n", "", 1),
+            "bogus row added": self.text.replace(body, body + "\n" + bogus, 1),
+            "unused bogus row added": self.text.replace(
+                body, body + "\n" + bogus.replace("| x |", f"| {UNUSED} |"), 1
+            ),
+            "command column renamed": self.text.replace(
+                "| `p106-stats` |", "| `p106-stats-x` |", 1
+            ),
+            "cell cleared": self.text.replace(row_5, cleared, 1),
+            "block changed": re.sub(
+                r"(<!-- cli-contract:begin -->\s*```json\n).*?(\n```)",
+                lambda m: m.group(1) + json.dumps(block, indent=2) + m.group(2),
+                self.text,
+                count=1,
+                flags=re.DOTALL,
+            ),
+        }
+        for name, mutated in mutants.items():
+            with self.subTest(name):
+                self.assertNotEqual(mutated, self.text)
+                self.assertTrue(exit_code_table_problems(mutated))
+
+
+def policy_links(path: Path) -> list[str]:
+    """Anchors of every Markdown link from `path` to docs/CLI-CONTRACT.md."""
+    anchors = []
+    for target in re.findall(r"\]\(([^)\s]+)\)", path.read_text(encoding="utf-8")):
+        file_part, _, anchor = target.partition("#")
+        if file_part and (path.parent / file_part).resolve() == DOC.resolve():
+            anchors.append(anchor)
+    return anchors
+
+
+class PolicyLinkTest(unittest.TestCase):
+    """CONTRIBUTING.md and STYLE.md link the flag-stability policy (#73)."""
+
+    def setUp(self) -> None:
+        text = DOC.read_text(encoding="utf-8")
+        self.anchors = {
+            github_anchor(m.group(1))
+            for m in re.finditer(r"^#{1,6} (.+)$", text, re.MULTILINE)
+        }
+
+    def assert_links_policy(self, path: Path) -> None:
+        links = policy_links(path)
+        self.assertIn("flag-stability-policy", links, path.name)
+        for anchor in filter(None, links):  # a bare file link has no anchor
+            self.assertIn(anchor, self.anchors, f"{path.name}: #{anchor}")
+
+    def test_style_links_policy(self) -> None:
+        self.assert_links_policy(ROOT / "docs" / "STYLE.md")
+
+    @unittest.skipUnless(
+        (ROOT / "CONTRIBUTING.md").exists(),
+        "source checkout only; the Docker test stage copies docs/ but not CONTRIBUTING.md",
+    )
+    def test_contributing_links_policy(self) -> None:
+        self.assert_links_policy(ROOT / "CONTRIBUTING.md")
 
 
 if __name__ == "__main__":
