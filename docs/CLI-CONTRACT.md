@@ -145,9 +145,9 @@ argparse definitions in-process (description, option help), without running
 the command, reading configuration, binding a socket or using the network.
 `tests/test_manpages_188.py` fails when a committed page differs from the
 generator's output. Generation and `--check` import the package and all four
-command modules, so they need the existing `api` extra installed
-(`pip install ".[api]"`, as for the tests); the installer itself only copies
-files.
+command modules, so they need the existing `api` extra installed from its
+hash lock, as for the tests (see [DEPENDENCY-LOCKS.md](DEPENDENCY-LOCKS.md));
+the installer itself only copies files.
 
 ```sh
 python scripts/gen_manpages.py            # regenerate man/man1/*.1

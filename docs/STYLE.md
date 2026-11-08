@@ -19,7 +19,7 @@ One issue per change, one PR per issue, full rationale in the commit body. Squas
 `E9`, `F` (pyflakes) and `I` (import order). Before pushing, run:
 
 ```sh
-pip install "ruff==0.16.9"
+python -m pip install --require-hashes -r requirements/ci.txt   # pins ruff==0.16.9
 ruff check .
 ruff format --check .   # or `ruff format .` to apply
 ```

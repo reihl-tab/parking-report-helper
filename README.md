@@ -108,12 +108,15 @@ photo bytes or deleting duplicate history.
 ## Requirements
 
 Python 3.11 or later, or Docker. The core CLI has no third-party dependencies; the
-API runner uses the `api` extra.
+API runner uses the `api` extra. Every install reads a hash-locked file under
+`requirements/` and the project itself installs with `--no-deps
+--no-build-isolation` (#177); see [docs/DEPENDENCY-LOCKS.md](docs/DEPENDENCY-LOCKS.md).
 
 ## Install and run
 
 ```sh
-pip install .
+python -m pip install --require-hashes -r requirements/build.txt
+python -m pip install --no-deps --no-build-isolation .
 parking-report sample.json
 parking-report sample.json --city "Example City" --name "Example Reporter"
 parking-report sample.json --no-photo
@@ -139,7 +142,8 @@ instead of skipping if `man/` is missing from the image.
 ## Offline preview and the API runner
 
 ```sh
-pip install ".[api]"
+python -m pip install --require-hashes -r requirements/build.txt -r requirements/api.txt
+python -m pip install --no-deps --no-build-isolation .
 parking-report-106 /private/reports/REPORT_FOLDER --addresses /private/addresses.json
 ```
 
@@ -225,7 +229,8 @@ in the array.
 ## Tests
 
 ```sh
-pip install .
+python -m pip install --require-hashes -r requirements/build.txt -r requirements/api.txt
+python -m pip install --no-deps --no-build-isolation .
 python -m unittest discover -s tests -v
 ```
 

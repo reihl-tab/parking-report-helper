@@ -29,6 +29,18 @@ The same scheme is used in every public repo. Do not add parallel label schemes.
 
 Decide where a file lives BEFORE creating it. The contract in `.repo-layout.yml` lists the allowed top-level directories, the file types permitted in each, and the required community-standards files; `python3 tools/check_repo_layout.py` enforces it in CI. A new kind of file means updating the contract in the same PR.
 
+## Dependencies (hash-locked)
+
+Python dependencies install only from the hash-locked files under `requirements/`, with `--require-hashes`; the project itself installs with `--no-deps --no-build-isolation` after `requirements/build.txt`. For development and tests:
+
+```sh
+python -m pip install --require-hashes -r requirements/build.txt -r requirements/api.txt
+python -m pip install --no-deps --no-build-isolation .
+python -m pip install --require-hashes -r requirements/ci.txt
+```
+
+A dependency change re-locks in the same PR. [docs/DEPENDENCY-LOCKS.md](docs/DEPENDENCY-LOCKS.md) has the commands, and `scripts/check_install_pins.py` (run by the tests) enforces it.
+
 ## CLI contract and versioning
 
 The four console commands are the supported operator API. Their flags, defaults, exit codes and JSON keys are pinned in [docs/CLI-CONTRACT.md](docs/CLI-CONTRACT.md), with one [exit-code table](docs/CLI-CONTRACT.md#exit-codes) for all of them. Any change to them follows the [flag-stability policy](docs/CLI-CONTRACT.md#flag-stability-policy): update the contract block and the generated man pages, add a `CHANGELOG.md` entry, and apply the semver bump the policy names, in the same PR.

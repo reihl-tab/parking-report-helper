@@ -1,0 +1,4 @@
+# Build prerequisites for `--no-build-isolation` installs of this project.
+# Must equal [build-system] requires in pyproject.toml (checked offline by
+# tools/check_install_pins.py).
+setuptools>=68

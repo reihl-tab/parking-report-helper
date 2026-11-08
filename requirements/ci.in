@@ -1,0 +1,8 @@
+# CI and lint tools, with the version ranges the workflows used before #177.
+# Compiled with requirements/api.txt as a constraint, so a package both files
+# pin carries the same version and hashes and the two install together.
+ruff==0.16.9
+mypy>=1.13,<2
+coverage
+bandit>=1.8,<2
+pip-audit>=2.9,<3
