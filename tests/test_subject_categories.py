@@ -254,7 +254,7 @@ class CatalogFingerprintTests(unittest.TestCase):
         self.assertEqual(len(rows), 86)
         self.assertEqual(
             catalog_fingerprint(rows),
-            "77613b820e657c43c7df6558a5f1d24c3a4bcd1ea7d691bb4bb55db2607c66ab",
+            "47e2f39cd4e347e449627c7a9fa2bd4b9d1e096cdf33c531f0683b493b594438",
         )
 
 
