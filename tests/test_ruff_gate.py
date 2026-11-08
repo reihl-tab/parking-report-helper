@@ -47,7 +47,10 @@ class RuffWorkflowTests(unittest.TestCase):
         self.job = job_block(self.text, "ruff")
 
     def test_job_pins_ruff_and_runs_both_checks(self):
-        self.assertIn('pip install "ruff==', self.job)
+        # ruff is pinned in the hash lock the job installs (#177).
+        self.assertIn("pip install --require-hashes -r requirements/ci.txt", self.job)
+        lock = (ROOT / "requirements" / "ci.txt").read_text(encoding="utf-8")
+        self.assertRegex(lock, r"(?m)^ruff==\d+\.\d+\.\d+ \\$")
         self.assertIn("ruff check --output-format=github .", self.job)
         self.assertIn("ruff format --check .", self.job)
         self.assertIn("RUFF_GATE: ${{ vars.RUFF_GATE }}", self.job)
