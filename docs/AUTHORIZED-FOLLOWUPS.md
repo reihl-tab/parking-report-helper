@@ -2,7 +2,9 @@
 
 A follow-up is a new municipal case, not a retry. The caller must independently
 verify owner authority, the current closed parent case, and the precise scope.
-A manifest is an audit record, never permission by itself.
+A manifest is an audit record, never permission by itself. A corrected
+re-filing of a still-open case on the same photo is not a follow-up; see
+[supersedes](API106.md#sanctioned-corrected-re-filing-supersedes) (#260).
 
 The private record may carry `followup` with exactly `parent_id`, `parent_digest`,
 `parent_case_number`, `parent_closed_at`, and `approval_reference`. No identity or
