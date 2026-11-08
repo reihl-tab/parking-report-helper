@@ -100,6 +100,25 @@ version is `0.6.0`. Changes to this contract follow the
 ```
 <!-- cli-contract:end -->
 
+## Exit codes
+
+One table for all four entry points, derived from the `exit_codes` of each
+command in the block above. `tests/test_cli_contract.py` fails when the two
+differ: a code, a row or a command added to one and not the other. — means
+the command never exits with that code on purpose. The table documents
+today's numbering; it renumbers nothing. Exits outside the documented paths
+(for example an uncaught exception or `KeyboardInterrupt`) are not covered.
+
+<!-- exit-code-table:begin -->
+| Code | Shared meaning | `parking-report` | `parking-report-106` | `parking-report-http` | `p106-stats` |
+|---|---|---|---|---|---|
+| `0` | Success, or `--help` | report text (or `--json` submissions) on stdout; `--help` | one JSON line, `dry_run` or `submit`; `--help` prints help instead | `-h`/`--help` only, before configuration is read or a socket is bound | output files written, one summary line on stdout |
+| `1` | Input or configuration error, message on stderr | `error: ...` on stderr | — | invalid configuration, fixed message | input, environment, fetch or write error, `p106-stats: ...` on stderr |
+| `2` | Usage error, usage text on stderr, never JSON | argparse or a flag-combination rule | argparse, no JSON | — | argparse or an invalid value |
+| `4` | Blocked (fail closed) | — | fixed `blocked` JSON line, no exception text | — | — |
+| `5` | Submitted, but a duplicate case was found | — | `duplicate_case_numbers` lists the cases | — | — |
+<!-- exit-code-table:end -->
+
 ## Notes on current behaviour
 
 - **`parking-report`** needs exactly one of `input` or `--intake DIR`. `--drive-folder` requires `--intake`, `--drive-api` requires `--drive-folder` (it's for a local test server only and is hidden from `--help`), and `--reporter` and `--json` require `--municipality`. A broken rule exits 2 with an argparse usage message.
@@ -214,7 +233,7 @@ for a help-text change.
 ## Known gaps (measured, not fixed here)
 
 1. `--json` isn't available everywhere. `parking-report` has it only with `--municipality`; plain report text has no JSON mode.
-2. Exit codes aren't shared across commands: `1` means input error in `parking-report`, and `4` means blocked in `parking-report-106`.
+2. Resolved by the [shared exit-code table](#exit-codes): `0`, `1` and `2` already mean the same in every command that uses them, and `4` and `5` exist only in `parking-report-106`. No code was renumbered.
 3. `parking-report-106`'s `prog` comes from `sys.argv[0]`, and its parser is built inside `main()`, not a `build_parser()`.
 4. Resolved by the [flag-stability policy](#flag-stability-policy): flag changes need a `CHANGELOG.md` entry.
 
@@ -245,6 +264,6 @@ flags, defaults, exit codes and JSON keys in the block above.
    gate (for example live-submission enablement, the exact reviewed digest,
    or the durable ledger).
 
-Follow-ups that need their own PRs: `--json` for plain report output, and a
-shared exit-code table.
+Follow-up that needs its own PR: `--json` for plain report output. The
+[shared exit-code table](#exit-codes) documents the current codes.
 Design for the remaining #73 work (proposal): [CLI-CONTRACT-DESIGN.md](CLI-CONTRACT-DESIGN.md).

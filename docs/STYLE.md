@@ -29,6 +29,10 @@ version. The job is report-only (a warning) until the repository variable
 `RUFF_GATE=on` makes it blocking, the same pattern as `MYPY_GATE`. Widening the
 rule set is its own PR with the fixes.
 
+## CLI contract and versioning
+
+Flags, defaults, exit codes and JSON keys of the console commands follow the [flag-stability policy](CLI-CONTRACT.md#flag-stability-policy) in [CLI-CONTRACT.md](CLI-CONTRACT.md), which also holds the shared [exit-code table](CLI-CONTRACT.md#exit-codes). A change to any of them updates the contract block, the generated man pages and `CHANGELOG.md` in the same PR.
+
 ## Language
 
 - Code, identifiers, comments, docs, commit messages and PR text are in **English**.

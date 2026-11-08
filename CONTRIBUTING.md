@@ -28,3 +28,7 @@ The same scheme is used in every public repo. Do not add parallel label schemes.
 ## File placement (enforced)
 
 Decide where a file lives BEFORE creating it. The contract in `.repo-layout.yml` lists the allowed top-level directories, the file types permitted in each, and the required community-standards files; `python3 tools/check_repo_layout.py` enforces it in CI. A new kind of file means updating the contract in the same PR.
+
+## CLI contract and versioning
+
+The four console commands are the supported operator API. Their flags, defaults, exit codes and JSON keys are pinned in [docs/CLI-CONTRACT.md](docs/CLI-CONTRACT.md), with one [exit-code table](docs/CLI-CONTRACT.md#exit-codes) for all of them. Any change to them follows the [flag-stability policy](docs/CLI-CONTRACT.md#flag-stability-policy): update the contract block and the generated man pages, add a `CHANGELOG.md` entry, and apply the semver bump the policy names, in the same PR.

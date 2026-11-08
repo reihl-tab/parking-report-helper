@@ -5,6 +5,8 @@ Flag, default, exit-code and JSON-key changes are recorded here, as required by 
 
 ## Unreleased (planned 0.6.0)
 
+- Docs: shared exit-code table for all four entry points in [CLI-CONTRACT.md](docs/CLI-CONTRACT.md#exit-codes), derived from the contract block's `exit_codes` and checked against it by `tests/test_cli_contract.py`; `CONTRIBUTING.md` and `docs/STYLE.md` now link the flag-stability policy (#73). Removed an empty `Unreleased` heading from this file. No flag, default or exit code changed, so no version change.
+
 - `parking-report-106`: add the controlled shared-photo extension and the `--approved-extension-sha256` gate (#293, [design](docs/SHARED-PHOTO-EXTENSION-DESIGN.md), [docs](docs/SHARED-PHOTO.md)). One explicitly approved, separately verified car may be reported from the unchanged original photo of one completed ordinary vehicle intake. The parent's payload digest is corroborated against preserved private submission artifacts and a recompute of the original inputs; a provisioned private HMAC guard index (seed supplied only at runtime via `PARKING_GUARD_SEED`/`PARKING_GUARD_KEY_ID`) blocks the same plate under the same original, and a bounded private index allows exactly one extension per original. Parent entries and the original photo index stay byte-for-byte unchanged; the ledger relation stays plate-free; derived guard keys live only in the private index. Additive; minor version bump per the flag-stability policy.
 
 ## Unreleased (planned 0.5.0)
@@ -20,5 +22,3 @@ Flag, default, exit-code and JSON-key changes are recorded here, as required by 
 - `parking-report-106`: after a successful submit, re-list today's cases and detect a server-side duplicate of the just-submitted text (#160). Duplicates exit with the new code 5 and print `duplicate_check: "duplicates_found"` plus `duplicate_case_numbers`; clean submissions print `duplicate_check: "single"` or `"pending"` and a failed check prints `"unavailable"` without failing the submission. New `api106.duplicate_case_numbers` helper. Minor version bump per the flag-stability policy.
 
 - Adopted the CLI flag-stability policy (#73). No flag, default or exit code changed.
-
-## Unreleased
