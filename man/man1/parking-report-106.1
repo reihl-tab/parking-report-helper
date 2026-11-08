@@ -18,6 +18,7 @@ input may be submitted explicitly
 [\fB\-\-approved\-followup\-sha256\fR\ \fIAPPROVED_FOLLOWUP_SHA256\fR]
 [\fB\-\-approved\-shared\-photo\-sha256\fR\ \fIAPPROVED_SHARED_PHOTO_SHA256\fR]
 [\fB\-\-approved\-extension\-sha256\fR\ \fIAPPROVED_EXTENSION_SHA256\fR]
+[\fB\-\-approved\-supersedes\-sha256\fR\ \fIAPPROVED_SUPERSEDES_SHA256\fR]
 [\fB\-\-approved\-category\-routing\fR\ \fI{crosswalk_parking,blocked_ramp}\fR]
 \fIfolder\fR
 .SH DESCRIPTION
@@ -65,6 +66,11 @@ original photo); must equal the reviewed digest.
 \fB\-\-approved\-extension\-sha256\fR \fIAPPROVED_EXTENSION_SHA256\fR
 Digest approval for a shared\-photo extension (one new car in a
 completed intake's unchanged original photo); must equal the reviewed
+digest.
+.TP
+\fB\-\-approved\-supersedes\-sha256\fR \fIAPPROVED_SUPERSEDES_SHA256\fR
+Digest approval for a supersedes manifest (a corrected re\-filing of a
+still\-open intake on the same original photo); must equal the reviewed
 digest.
 .TP
 \fB\-\-approved\-category\-routing\fR \fI{crosswalk_parking,blocked_ramp}\fR

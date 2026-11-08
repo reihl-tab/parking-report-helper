@@ -86,6 +86,20 @@ def prepare(
             event_type=record.get("violation", {}).get("category"),
             municipal_subject=record["municipal_subject"],
         )
+    if "supersedes" in record:
+        from .supersedes import validate_supersedes
+
+        if any(
+            key in record
+            for key in ("followup", "shared_photo", "shared_photo_extension")
+        ):
+            raise ValueError("A supersedes manifest cannot combine another relation")
+        # The manifest and the new intake ID enter the preview digest, so the
+        # corrected re-filing never shares its parent's digest.
+        fingerprint["supersedes"] = dict(
+            validate_supersedes(record["supersedes"], folder.name),
+            member=folder.name,
+        )
     if "followup" in record:
         from .followup import validate_followup
 
@@ -102,9 +116,18 @@ def prepare(
         # Every manifest field plus the new intake ID enters the preview digest.
         extension = extension_manifest(record, folder.name, photo_hash)
         fingerprint["shared_photo_extension"] = dict(extension, member=folder.name)
+    if "supersedes" in fingerprint:
+        # Exact duplicate (#260): the corrected payload without its manifest
+        # must differ from the parent's reviewed digest.
+        base = {k: v for k, v in fingerprint.items() if k != "supersedes"}
+        if _digest(base) == fingerprint["supersedes"]["parent_digest"]:
+            raise ValueError("A corrected re-filing must change its parent's payload")
+    return contact, report, jpeg, _digest(fingerprint)
+
+
+def _digest(fingerprint: Mapping[str, Any]) -> str:
     canonical = json.dumps(fingerprint, ensure_ascii=False, sort_keys=True)
-    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    return contact, report, jpeg, digest
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -121,6 +144,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--approved-followup-sha256", default="")
     p.add_argument("--approved-shared-photo-sha256", default="")
     p.add_argument("--approved-extension-sha256", default="")
+    p.add_argument("--approved-supersedes-sha256", default="")
     p.add_argument(
         "--approved-category-routing",
         choices=("crosswalk_parking", "blocked_ramp"),
@@ -147,6 +171,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         followup = record_for_photo.get("followup")
         shared = record_for_photo.get("shared_photo")
         extension = record_for_photo.get("shared_photo_extension")
+        supersedes = record_for_photo.get("supersedes")
         _approval_gate(
             args, followup, args.approved_followup_sha256, digest, "Follow-up"
         )
@@ -156,8 +181,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         _approval_gate(
             args, extension, args.approved_extension_sha256, digest, "Extension"
         )
-        # Follow-up, shared-photo and extension previews reserve nothing.
-        exception = followup is not None or shared is not None or extension is not None
+        _approval_gate(
+            args, supersedes, args.approved_supersedes_sha256, digest, "Supersedes"
+        )
+        # Follow-up, shared-photo, extension and supersedes previews reserve nothing.
+        exception = any(
+            value is not None for value in (followup, shared, extension, supersedes)
+        )
         reserve_ledger = ledger if args.submit or not exception else None
         with reserve_ledger.locked() if reserve_ledger else nullcontext():
             entry = None
@@ -173,6 +203,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     extension,
                     args.addresses,
                     reporter,
+                    supersedes,
                 )
             return execute(
                 args, contact, report, jpeg, digest, ledger, entry, report_id
@@ -228,8 +259,11 @@ def _reserve(
     extension: Any = None,
     addresses: Any = None,
     reporter: Any = None,
+    supersedes: Any = None,
 ) -> Any:
     report_id = folder.name
+    if supersedes is not None:
+        return ledger.reserve(report_id, digest, photo_hash, supersedes=supersedes)
     if followup is not None:
         return ledger.reserve(report_id, digest, photo_hash, followup=followup)
     if shared is not None:

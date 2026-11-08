@@ -117,11 +117,15 @@ class GitLedger:
         shared_photo: dict[str, Any] | None = None,
         extension: dict[str, str] | None = None,
         guard: GuardKey | None = None,
+        supersedes: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,119}", report_id):
             raise LedgerError("Stable intake ID must be an opaque folder name")
         if any(not re.fullmatch(_HASH, value) for value in (digest, photo_hash)):
             raise LedgerError("Invalid payload/photo digest")
+        supersedes = self._supersedes(
+            report_id, supersedes, followup, shared_photo, extension, guard
+        )
         followup, group, extension, relation = self._relations(
             followup, shared_photo, extension, guard
         )
@@ -129,12 +133,18 @@ class GitLedger:
         key = hashlib.sha256(report_id.encode()).hexdigest()
         existing = reports.get(key)
         if existing:
-            if self._changed(existing, digest, photo_hash, followup, group, relation):
+            if (
+                self._changed(existing, digest, photo_hash, followup, group, relation)
+                or existing.get("supersedes") != supersedes
+            ):
                 raise LedgerError(
                     "Existing intake ID has changed inputs; review without creating a new case"
                 )
             return existing
-        self._bind(key, photo_hash, followup, group, extension, relation, guard)
+        if supersedes is not None:
+            self._supersede(key, report_id, digest, photo_hash, supersedes)
+        else:
+            self._bind(key, photo_hash, followup, group, extension, relation, guard)
         entry: dict[str, Any] = {
             "digest": digest,
             "photo_sha256": photo_hash,
@@ -146,8 +156,10 @@ class GitLedger:
             entry["shared_photo"] = group["group"]
         if relation is not None:
             entry["extension"] = relation
+        if supersedes is not None:
+            entry["supersedes"] = supersedes
         reports[key] = entry
-        if followup is None and relation is None:
+        if followup is None and relation is None and supersedes is None:
             # A second group member keeps the first member as the photo's origin.
             self.data["photos"].setdefault(photo_hash, key)
         self.persist()
@@ -186,6 +198,69 @@ class GitLedger:
         elif guard is not None:
             raise LedgerError("A private guard key requires an extension manifest")
         return followup, self._shared_group(followup, shared_photo), extension, relation
+
+    @staticmethod
+    def _supersedes(
+        report_id: str,
+        supersedes: dict[str, str] | None,
+        followup: dict[str, str] | None,
+        shared_photo: dict[str, Any] | None,
+        extension: dict[str, str] | None,
+        guard: GuardKey | None,
+    ) -> dict[str, str] | None:
+        """Validate an optional supersedes manifest; it combines with no relation."""
+        if supersedes is None:
+            return None
+        if any(v is not None for v in (followup, shared_photo, extension, guard)):
+            raise LedgerError(
+                "A supersedes manifest cannot combine a follow-up, shared photo or extension"
+            )
+        from .supersedes import validate_supersedes
+
+        try:
+            return validate_supersedes(supersedes, report_id)
+        except ValueError:
+            raise LedgerError("Invalid supersedes manifest") from None
+
+    def _supersede(
+        self,
+        key: str,
+        report_id: str,
+        digest: str,
+        photo_hash: str,
+        manifest: dict[str, str],
+    ) -> None:
+        """Link one corrected re-filing to its still-open parent (#260).
+
+        The child may reuse the parent's original photo under its own intake
+        ID. The parent gains only ``superseded_by``; its digest, state, case
+        number and the original photo index stay unchanged.
+        """
+        from .supersedes import SUPERSEDABLE_STATES
+
+        reports = self.data["reports"]
+        parent_key = hashlib.sha256(manifest["parent_id"].encode()).hexdigest()
+        parent = reports.get(parent_key)
+        if parent_key == key or not isinstance(parent, dict):
+            raise LedgerError("Supersedes parent is missing or self-referential")
+        if parent.get("digest") != manifest["parent_digest"]:
+            raise LedgerError("Supersedes parent digest differs")
+        if parent.get("photo_sha256") != photo_hash:
+            raise LedgerError("Supersedes parent has another original photo")
+        state = parent.get("state")
+        status = state.get("status") if isinstance(state, dict) else None
+        if status not in SUPERSEDABLE_STATES:
+            raise LedgerError("Supersedes parent is not in an open ledger state")
+        if digest == parent["digest"]:
+            raise LedgerError("Supersedes payload is an exact duplicate of its parent")
+        if any(k in parent for k in ("followup", "shared_photo", "extension")):
+            raise LedgerError("Supersedes parent is not an ordinary intake")
+        if "superseded_by" in parent:
+            raise LedgerError("Supersedes parent is already superseded")
+        origin = self.data["photos"].get(photo_hash)
+        if not origin or origin not in reports:
+            raise LedgerError("Supersedes photo index is missing")
+        parent["superseded_by"] = report_id
 
     @staticmethod
     def _changed(
