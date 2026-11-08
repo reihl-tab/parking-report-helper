@@ -6,6 +6,12 @@ switch. The catalog in `src/parking_report/configs/subjects.json` contains the
 all duplicate category paths. Source: GetSubjectCategories response captured on
 2026-10-05. This snapshot does not prove current availability, municipal scope,
 or a verified mapping from photos to codes. Category codes are not subject codes.
+The read contract for a live refresh (method, token placement, response shape,
+flattening and fingerprint comparison) is documented and verified in
+[API106.md](API106.md); a 2026-11-08 read-only check found the live catalog
+covering exactly the same codes as this snapshot, with one whitespace-only
+name difference (code 1291). Refreshing the snapshot is a reviewed change,
+not an automatic step.
 
 Example, synthetic non-vehicle event:
 

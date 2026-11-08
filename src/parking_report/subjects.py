@@ -2,11 +2,70 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from importlib.resources import files
 from typing import Any
 
 DEFAULT_SUBJECT = "1145"
+
+_MAX_CATEGORY_ROWS = 10000
+_MAX_CATEGORY_DEPTH = 10
+
+
+def flatten_category_tree(nodes: Any) -> list[dict[str, Any]]:
+    """Flatten a GetSubjectCategories tree into captured-catalog rows.
+
+    Every node must carry a non-empty categoryName; children, when present,
+    must be a list of nodes. Only subject-bearing nodes (subjectCode set)
+    produce rows, preserving repeated codes under different parents, exactly
+    like the captured catalog. Fails closed on any malformed node.
+    """
+    if not isinstance(nodes, list):
+        raise ValueError("Category tree must be a list of nodes")  # noqa: TRY004 - malformed input data; callers catch ValueError
+    rows: list[dict[str, Any]] = []
+    for node in nodes:
+        _flatten_node(node, [], rows)
+    return rows
+
+
+def _flatten_node(node: Any, path: list[str], rows: list[dict[str, Any]]) -> None:
+    if len(path) >= _MAX_CATEGORY_DEPTH:
+        raise ValueError("Category tree is too deep")
+    if not isinstance(node, dict):
+        raise ValueError("Category node must be an object")  # noqa: TRY004 - malformed input data; callers catch ValueError
+    name = node.get("categoryName")
+    code = node.get("subjectCode")
+    children = node.get("children")
+    if (
+        not isinstance(name, str)
+        or not name.strip()
+        or (
+            code is not None
+            and not (isinstance(code, str) and code.isascii() and code.isdigit())
+        )
+        or (children is not None and not isinstance(children, list))
+    ):
+        raise ValueError("Invalid category node")
+    if code is not None:
+        rows.append({"code": code, "name": name, "path": path + [name]})
+        if len(rows) > _MAX_CATEGORY_ROWS:
+            raise ValueError("Category tree is too large")
+    for child in children or []:
+        _flatten_node(child, path + [name], rows)
+
+
+def catalog_fingerprint(rows: list[dict[str, Any]]) -> str:
+    """Stable sha256 over sorted (code, name, path) rows; secret-free.
+
+    Comparable between a live flattened tree and the captured catalog, so a
+    refresh can detect municipal additions, removals and renames.
+    """
+    items = sorted(
+        json.dumps([row["code"], row["name"], row["path"]], ensure_ascii=False)
+        for row in rows
+    )
+    return hashlib.sha256("\n".join(items).encode("utf-8")).hexdigest()
 
 
 def load_catalog() -> dict[str, list[dict[str, Any]]]:

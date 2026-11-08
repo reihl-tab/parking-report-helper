@@ -373,6 +373,54 @@ class Municipality:
             raise APIError("Login returned no token.")
         return token
 
+    def list_subject_categories(self, token: str) -> list[dict[str, Any]]:
+        """GET the municipal subject-category tree; read-only, creates nothing.
+
+        Contract from the documented original capture, verified by one bounded
+        read-only request on 2026-11-08: the session token travels in the URL
+        query, never in a header or JSON body. See docs/API106.md.
+        """
+        if (
+            not isinstance(token, str)
+            or not token
+            or len(token) > 4096
+            or any(c.isspace() or ord(c) < 32 for c in token)
+        ):
+            raise InputError("Invalid session token.")
+        endpoint = "GetSubjectCategories?token=" + urllib.parse.quote(token, safe="")
+        request = urllib.request.Request(
+            BASE + endpoint,
+            method="GET",
+            headers={
+                "Ocp-Apim-Subscription-Key": self.credentials["subscription_key"],
+                "Content-Type": "text/plain",
+                "User-Agent": "App 106",
+            },
+        )
+        try:
+            with urllib.request.build_opener(NoRedirect()).open(
+                request, timeout=45
+            ) as response:
+                raw = response.read(16 * 1024 * 1024 + 1)
+            if len(raw) > 16 * 1024 * 1024:
+                raise ValueError()
+            result = json.loads(raw)
+            if (
+                not isinstance(result, list)
+                or len(result) > 1000
+                or any(not isinstance(item, dict) for item in result)
+            ):
+                raise ValueError()
+        except urllib.error.HTTPError as exc:
+            # Never include request URL, response body, identity or token, even
+            # in chained exception tracebacks. Redirects are refused, not followed.
+            raise APIError(f"Subject categories: HTTP {exc.code}.") from None
+        except (OSError, ValueError, urllib.error.URLError, RecursionError):
+            raise APIError(
+                "Subject categories failed or returned an invalid response."
+            ) from None
+        return result
+
     def list_cases(
         self, token: str, reporter: dict[str, Any], *, from_date: str
     ) -> dict[str, Any]:
