@@ -22,7 +22,8 @@
       ".dockerignore",
       ".gitignore",
       "Dockerfile",
-      "LICENSE"
+      "LICENSE",
+      "deps-inventory.json"
     ],
     "deny": [
       "*.py"

@@ -32,11 +32,18 @@ class TestPrivateRunner(unittest.TestCase):
         files += sorted((ROOT / ".github/workflows").glob("*.y*ml"))
         for path in files:
             with self.subTest(path=path.relative_to(ROOT).as_posix()):
+                text = path.read_text(encoding="utf-8")
                 labels = re.findall(
                     r"^\s*runs-on:\s*(\S+)",
-                    path.read_text(encoding="utf-8"),
+                    text,
                     re.MULTILINE,
                 )
-                self.assertTrue(labels, "no runs-on found")
+                if not labels:
+                    # Reusable-caller jobs (job-level `uses:`) have no runner
+                    # of their own; runner pinning is enforced in the called
+                    # workflow. Step-level `uses:` (actions) is deeper than 4
+                    # spaces and does not count.
+                    callers = re.findall(r"^    uses:\s*\S+", text, re.MULTILINE)
+                    self.assertTrue(callers, "no runs-on found")
                 for label in labels:
                     self.assertNotRegex(label, r"-latest$")
