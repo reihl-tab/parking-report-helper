@@ -43,6 +43,7 @@ version is `0.6.0`. Changes to this contract follow the
         "--approved-sha256": {"default": ""},
         "--approved-followup-sha256": {"default": ""},
         "--approved-shared-photo-sha256": {"default": ""},
+        "--approved-shared-issue-sha256": {"default": ""},
         "--approved-extension-sha256": {"default": ""},
         "--approved-supersedes-sha256": {"default": ""},
         "--retry-photo": {"default": false, "flag": true},

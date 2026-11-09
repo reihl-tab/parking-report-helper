@@ -17,6 +17,7 @@ input may be submitted explicitly
 [\fB\-\-retry\-photo\fR]
 [\fB\-\-approved\-followup\-sha256\fR\ \fIAPPROVED_FOLLOWUP_SHA256\fR]
 [\fB\-\-approved\-shared\-photo\-sha256\fR\ \fIAPPROVED_SHARED_PHOTO_SHA256\fR]
+[\fB\-\-approved\-shared\-issue\-sha256\fR\ \fIAPPROVED_SHARED_ISSUE_SHA256\fR]
 [\fB\-\-approved\-extension\-sha256\fR\ \fIAPPROVED_EXTENSION_SHA256\fR]
 [\fB\-\-approved\-supersedes\-sha256\fR\ \fIAPPROVED_SUPERSEDES_SHA256\fR]
 [\fB\-\-approved\-category\-routing\fR\ \fI{crosswalk_parking,blocked_ramp}\fR]
@@ -62,6 +63,11 @@ reviewed digest.
 \fB\-\-approved\-shared\-photo\-sha256\fR \fIAPPROVED_SHARED_PHOTO_SHA256\fR
 Digest approval for a shared\-photo manifest (two distinct cars in one
 original photo); must equal the reviewed digest.
+.TP
+\fB\-\-approved\-shared\-issue\-sha256\fR \fIAPPROVED_SHARED_ISSUE_SHA256\fR
+Digest approval for a shared\-issue manifest (two distinct non\-vehicle
+issues grounded in one original photo); must equal the reviewed
+digest.
 .TP
 \fB\-\-approved\-extension\-sha256\fR \fIAPPROVED_EXTENSION_SHA256\fR
 Digest approval for a shared\-photo extension (one new car in a

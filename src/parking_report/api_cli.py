@@ -96,43 +96,63 @@ def prepare(
             event_type=record.get("violation", {}).get("category"),
             municipal_subject=record["municipal_subject"],
         )
+    _bind_relations(record, folder.name, photo_hash, fingerprint)
+    return contact, report, jpeg, _digest(fingerprint)
+
+
+def _bind_relations(
+    record: dict[str, Any], intake_id: str, photo_hash: str, fingerprint: dict[str, Any]
+) -> None:
+    """Bind every declared relation manifest into the preview digest."""
     if "supersedes" in record:
         from .supersedes import validate_supersedes
 
         if any(
             key in record
-            for key in ("followup", "shared_photo", "shared_photo_extension")
+            for key in (
+                "followup",
+                "shared_photo",
+                "shared_photo_extension",
+                "shared_photo_issue",
+            )
         ):
             raise ValueError("A supersedes manifest cannot combine another relation")
         # The manifest and the new intake ID enter the preview digest, so the
         # corrected re-filing never shares its parent's digest.
         fingerprint["supersedes"] = dict(
-            validate_supersedes(record["supersedes"], folder.name),
-            member=folder.name,
+            validate_supersedes(record["supersedes"], intake_id),
+            member=intake_id,
         )
     if "followup" in record:
         from .followup import validate_followup
 
         fingerprint["followup"] = validate_followup(record["followup"])
+    if "shared_photo" in record and "shared_photo_issue" in record:
+        raise ValueError("A record cannot carry both shared-photo manifests")
     if "shared_photo" in record:
         from .shared_photo import member_manifest
 
         # The member's own ID keeps each car's digest, state and receipt distinct.
-        manifest = member_manifest(record, folder.name, photo_hash)
-        fingerprint["shared_photo"] = dict(manifest, member=folder.name)
+        manifest = member_manifest(record, intake_id, photo_hash)
+        fingerprint["shared_photo"] = dict(manifest, member=intake_id)
+    if "shared_photo_issue" in record:
+        from .shared_issue import member_manifest
+
+        # The member's own ID keeps each issue's digest, state and receipt distinct.
+        issue_manifest = member_manifest(record, intake_id, photo_hash)
+        fingerprint["shared_photo_issue"] = dict(issue_manifest, member=intake_id)
     if "shared_photo_extension" in record:
         from .shared_photo_extension import extension_manifest
 
         # Every manifest field plus the new intake ID enters the preview digest.
-        extension = extension_manifest(record, folder.name, photo_hash)
-        fingerprint["shared_photo_extension"] = dict(extension, member=folder.name)
+        extension = extension_manifest(record, intake_id, photo_hash)
+        fingerprint["shared_photo_extension"] = dict(extension, member=intake_id)
     if "supersedes" in fingerprint:
         # Exact duplicate (#260): the corrected payload without its manifest
         # must differ from the parent's reviewed digest.
         base = {k: v for k, v in fingerprint.items() if k != "supersedes"}
         if _digest(base) == fingerprint["supersedes"]["parent_digest"]:
             raise ValueError("A corrected re-filing must change its parent's payload")
-    return contact, report, jpeg, _digest(fingerprint)
 
 
 def _digest(fingerprint: Mapping[str, Any]) -> str:
@@ -153,6 +173,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--retry-photo", action="store_true")
     p.add_argument("--approved-followup-sha256", default="")
     p.add_argument("--approved-shared-photo-sha256", default="")
+    p.add_argument("--approved-shared-issue-sha256", default="")
     p.add_argument("--approved-extension-sha256", default="")
     p.add_argument("--approved-supersedes-sha256", default="")
     p.add_argument(
@@ -180,6 +201,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         photo_hash, _, _ = read_picture(args.folder / record_for_photo["photo"])
         followup = record_for_photo.get("followup")
         shared = record_for_photo.get("shared_photo")
+        issue = record_for_photo.get("shared_photo_issue")
         extension = record_for_photo.get("shared_photo_extension")
         supersedes = record_for_photo.get("supersedes")
         _approval_gate(
@@ -189,6 +211,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             args, shared, args.approved_shared_photo_sha256, digest, "Shared photo"
         )
         _approval_gate(
+            args, issue, args.approved_shared_issue_sha256, digest, "Shared issue"
+        )
+        _approval_gate(
             args, extension, args.approved_extension_sha256, digest, "Extension"
         )
         _approval_gate(
@@ -196,7 +221,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         # Follow-up, shared-photo, extension and supersedes previews reserve nothing.
         exception = any(
-            value is not None for value in (followup, shared, extension, supersedes)
+            value is not None
+            for value in (followup, shared, issue, extension, supersedes)
         )
         reserve_ledger = ledger if args.submit or not exception else None
         with reserve_ledger.locked() if reserve_ledger else nullcontext():
@@ -214,6 +240,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     args.addresses,
                     reporter,
                     supersedes,
+                    issue,
                 )
             return execute(
                 args, contact, report, jpeg, digest, ledger, entry, report_id
@@ -270,6 +297,7 @@ def _reserve(
     addresses: Any = None,
     reporter: Any = None,
     supersedes: Any = None,
+    issue: Any = None,
 ) -> Any:
     report_id = folder.name
     if supersedes is not None:
@@ -282,6 +310,12 @@ def _reserve(
         # Fail closed: the plate-free ledger cannot compare the two manifests.
         check_sibling(folder, shared)
         return ledger.reserve(report_id, digest, photo_hash, shared_photo=shared)
+    if issue is not None:
+        from .shared_issue import check_sibling
+
+        # Fail closed: the content-free ledger cannot compare the two manifests.
+        check_sibling(folder, issue)
+        return ledger.reserve(report_id, digest, photo_hash, shared_issue=issue)
     if extension is not None:
         from .shared_photo_extension import corroborate_parent
 
