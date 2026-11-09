@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from synthetic_contact import SYNTHETIC_ID, SYNTHETIC_PHONE
 
+from parking_report import api106
 from parking_report.api_cli import execute, prepare
 from parking_report.intake import record_to_car
 from parking_report.report import build_report
@@ -332,5 +333,5 @@ class ApproximateNoteTests(unittest.TestCase):
     def test_without_the_flag_the_absent_house_fails_closed(self):
         self.photo()
         self.record(False)
-        with self.assertRaises(Exception):
+        with self.assertRaisesRegex(api106.InputError, "absent from the address"):
             prepare(self.folder, self.addresses, self.reporter)

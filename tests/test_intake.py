@@ -40,6 +40,19 @@ class TestReadIntake(unittest.TestCase):
         record["address"]["approximate"] = True
         self.assertIn("40", record_to_car(record)["street"])
 
+    def test_approximate_note_requires_exact_true_flag(self):
+        # #323 F1: pins the one-flag definition - a truthy value that is not
+        # exactly True must not add the approximation note.
+        record = json.loads(
+            (INTAKE / "2026-10-05_1005_ab12" / "report.json").read_text()
+        )
+        record["address"]["approximate"] = 1
+        self.assertNotIn("קירוב", record_to_car(record)["notes"])
+        del record["address"]["approximate"]
+        self.assertNotIn("קירוב", record_to_car(record)["notes"])
+        record["address"]["approximate"] = True
+        self.assertIn("קירוב", record_to_car(record)["notes"])
+
     def test_location_description_is_in_draft_without_coordinates(self):
         record = json.loads(
             (INTAKE / "2026-10-05_1005_ab12" / "report.json").read_text()

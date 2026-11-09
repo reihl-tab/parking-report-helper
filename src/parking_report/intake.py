@@ -98,7 +98,8 @@ def _build_car(
     registry_text = describe_he(record.get("registry")) if parking else ""
     if registry_text:
         car["registry_text"] = registry_text
-    if address.get("approximate"):
+    # One flag definition, like prepare (#322 N1).
+    if address.get("approximate") is True:
         car["notes"] += ". הכתובת היא קירוב"
     return car
 
