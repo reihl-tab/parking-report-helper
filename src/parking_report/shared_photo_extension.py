@@ -88,9 +88,10 @@ def extension_manifest(
     plate = record.get("plate")
     if not isinstance(plate, str) or plate_digits(plate) != manifest["plate"]:
         raise ValueError("Intake plate does not match its extension manifest")
-    from .subjects import is_parking_subject, select_subject
+    from .subjects import is_parking_selection
 
-    if not is_parking_subject(select_subject(record)):
+    # The recorded path decides for multi-parent codes such as 5164 (#317).
+    if not is_parking_selection(record):
         raise ValueError("A shared-photo extension reports a vehicle")
     return manifest
 
@@ -139,13 +140,14 @@ def _check_parent_record(record: dict[str, Any], manifest: dict[str, str]) -> No
         key in record for key in ("followup", "shared_photo", "shared_photo_extension")
     ):
         raise ValueError("Extension parent record is not an ordinary intake")
-    from .subjects import is_parking_subject, select_subject
+    from .subjects import is_parking_selection
 
+    # The recorded path decides for multi-parent codes such as 5164 (#317).
     try:
-        code = select_subject(record)
+        parking = is_parking_selection(record)
     except ValueError:
         raise ValueError("Extension parent subject is invalid") from None
-    if not is_parking_subject(code):
+    if not parking:
         raise ValueError("Extension parent is not a vehicle intake")
     plate = record.get("plate")
     if not isinstance(plate, str) or plate_digits(plate) != manifest["parent_plate"]:

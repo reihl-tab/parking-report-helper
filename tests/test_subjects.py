@@ -111,8 +111,12 @@ class SubjectTests(unittest.TestCase):
         ):
             r = record("5164", "sign_request")
             r["municipal_subject"]["path"] = bad_path
-            with self.subTest(path=bad_path), self.assertRaises(ValueError):
-                validate_owner_choice(r, "5164")
+            with self.subTest(path=bad_path):
+                with self.assertRaises(ValueError):
+                    validate_owner_choice(r, "5164")
+                # Intake fails closed too, on the path, not on the plate (#317).
+                with self.assertRaisesRegex(ValueError, "path"):
+                    record_to_car(r)
 
     def test_generic_draft_needs_no_plate_or_inspector(self):
         r = record()

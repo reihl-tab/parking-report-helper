@@ -234,29 +234,29 @@ class HebrewFinalLetterTests(unittest.TestCase):
 
     def test_approximate_owner_confirmed_number_uses_street_centroid(self):
         addr = self._addresses(
-            [{"StreetCode": "1366", "StreetName": "מעגלי יבנה"}],
+            [{"StreetCode": "9201", "StreetName": "רחוב הדוגמה"}],
             [
-                [31.759107, 35.212276, "1", "מעגלי יבנה"],
-                [31.756002, 35.210245, "24", "מעגלי יבנה"],
+                [31.781000, 35.221000, "1", "רחוב הדוגמה"],
+                [31.779000, 35.219000, "24", "רחוב הדוגמה"],
             ],
         )
-        with self.assertRaisesRegex(
-            api106.InputError, "absent from the address data"
-        ):
-            addr.resolve("מעגלי יבנה", "110", None)
-        result = addr.resolve("מעגלי יבנה", "110", None, approximate=True)
-        self.assertEqual(result["street_code"], "1366")
-        self.assertEqual(result["house"], "110")
+        with self.assertRaisesRegex(api106.InputError, "absent from the address data"):
+            addr.resolve("רחוב הדוגמה", "77", None)
+        result = addr.resolve("רחוב הדוגמה", "77", None, approximate=True)
+        self.assertEqual(result["street_code"], "9201")
+        self.assertEqual(result["house"], "77")
         self.assertEqual(result["coordinate_source"], "approximate_street_centroid")
-        (x1, y1) = api106.ITM.transform(35.212276, 31.759107)
-        (x2, y2) = api106.ITM.transform(35.210245, 31.756002)
+        (x1, y1) = api106.ITM.transform(35.221000, 31.781000)
+        (x2, y2) = api106.ITM.transform(35.219000, 31.779000)
         self.assertEqual(result["x"], int((x1 + x2) / 2))
         self.assertEqual(result["y"], int((y1 + y2) / 2))
 
     def test_approximate_needs_street_points(self):
-        addr = self._addresses([{"StreetCode": "1366", "StreetName": "מעגלי יבנה"}], [])
+        addr = self._addresses(
+            [{"StreetCode": "9201", "StreetName": "רחוב הדוגמה"}], []
+        )
         with self.assertRaisesRegex(api106.InputError, "no address points"):
-            addr.resolve("מעגלי יבנה", "110", None, approximate=True)
+            addr.resolve("רחוב הדוגמה", "77", None, approximate=True)
 
     def test_resolve_accepts_final_letter_variant(self):
         addr = self._addresses(

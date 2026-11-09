@@ -62,7 +62,8 @@ def prepare(
         check_text(address["street"], "Street"),
         str(address["house_number"]),
         gps,
-        approximate=bool(address.get("approximate")),
+        # Only a JSON true opts in; "false", 0 or 1 stay fail-closed (#317).
+        approximate=address.get("approximate") is True,
     )
     description = build_report(car)
     if "approved_description" in record:
