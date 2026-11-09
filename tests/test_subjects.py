@@ -69,6 +69,51 @@ class SubjectTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_owner_choice(r, "1072")
 
+    def test_recorded_path_picks_the_catalog_row(self):
+        # 5164 ("אחר") sits under 12 parents including "חניה אסורה"; the
+        # recorded path, not any(), decides whether a plate is required.
+        sign = record("5164", "sign_request")
+        sign["municipal_subject"]["path"] = ["שילוט ותמרורים", "אחר"]
+        validate_owner_choice(sign, "5164")
+        car = record_to_car(sign)
+        self.assertEqual(car["draft_kind"], "municipal_issue")
+        self.assertNotIn("מספר רכב", build_report(car))
+
+        bollard = record("5164", "bollard_request")
+        bollard["municipal_subject"]["path"] = ["גדרות, מעקות, עמודים", "אחר"]
+        validate_owner_choice(bollard, "5164")
+        self.assertEqual(record_to_car(bollard)["draft_kind"], "municipal_issue")
+
+        flooding = record("5164", "bike_path_flooding")
+        flooding["municipal_subject"]["path"] = ["נזילות / תקלות מים", "אחר"]
+        validate_owner_choice(flooding, "5164")
+        self.assertEqual(record_to_car(flooding)["draft_kind"], "municipal_issue")
+
+        parking = record("5164", "crosswalk_parking")
+        parking["municipal_subject"]["path"] = ["חניה אסורה", "אחר"]
+        validate_owner_choice(parking, "5164")
+        with self.assertRaisesRegex(ValueError, "plate"):
+            record_to_car(parking)
+
+    def test_missing_or_bad_path_fails_closed(self):
+        # No recorded path: any() fallback keeps 5164 parking (plate required).
+        with self.assertRaisesRegex(ValueError, "plate"):
+            record_to_car(record("5164", "bike_path_flooding"))
+        # A real parking subject still requires a plate.
+        with self.assertRaisesRegex(ValueError, "plate"):
+            record_to_car(record("1145", "sidewalk_parking"))
+        for bad_path in (
+            "שילוט ותמרורים",
+            [],
+            [["שילוט ותמרורים", "אחר"]],
+            ["שילוט ותמרורים", "נקודה מומצאת"],
+            ["נזילות / תקלות מים", "אחר", "אחר"],
+        ):
+            r = record("5164", "sign_request")
+            r["municipal_subject"]["path"] = bad_path
+            with self.subTest(path=bad_path), self.assertRaises(ValueError):
+                validate_owner_choice(r, "5164")
+
     def test_generic_draft_needs_no_plate_or_inspector(self):
         r = record()
         text = build_report(record_to_car(r))

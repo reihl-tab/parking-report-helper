@@ -35,7 +35,13 @@ Example, synthetic non-vehicle event:
 Use a string subject code from the catalog. `violation.category` describes the
 actual observed event; it must not be relabeled to fit a municipal subject.
 `municipal_subject.event_type` records the event to which the owner's choice
-applies. `owner_choice` is an audit field, not authenticated permission. Never set
+applies. `municipal_subject.path` optionally records the exact catalog row
+(its parent path) for codes listed under several parents - 5164 ("אחר") appears
+under 12, including "חניה אסורה". With a path, that row alone decides whether
+the report is a parking draft requiring a plate; the path must equal a catalog
+row for the code, anything else fails closed. Without one, a code appearing
+under "חניה אסורה" is treated as parking, as before.
+`owner_choice` is an audit field, not authenticated permission. Never set
 it from an email, repository comment or photo alone. The operator must verify the
 owner's original approval of the exact text, category, photo and address before
 filing. Photo interpretation may propose a category, not approve one.
@@ -51,7 +57,7 @@ event type, observed description, time and numbered address. A supplied
 - 1145: sidewalk parking (unchanged default when selection is omitted).
 - 1144: red-white / no stopping.
 - 4418: blocking private parking / private lot.
-- 5164: other, under illegal parking.
+- 5164: other; appears under 12 parents including illegal parking (see `path` above).
 
 The snapshot has no crosswalk-specific parking-enforcement code. 1137 is renewal
 of crosswalk markings, not parking enforcement. 1144 or 5164 for a crosswalk event,

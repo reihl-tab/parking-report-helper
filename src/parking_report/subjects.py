@@ -112,6 +112,37 @@ def is_parking_subject(code: str) -> bool:
     return any(row["path"][0] == "חניה אסורה" for row in load_catalog()[code])
 
 
+def recorded_path(record: dict[str, Any]) -> list[str] | None:
+    """Validated catalog path recorded with an explicit subject choice, or None.
+
+    Codes like 5164 ("אחר") sit under several parents, including "חניה אסורה";
+    any() alone marks every such code parking and wrongly demands a plate for
+    non-parking issues. The recorded path picks the intended catalog row.
+    """
+    selection = record.get("municipal_subject")
+    if not isinstance(selection, dict) or "path" not in selection:
+        return None
+    path = selection["path"]
+    if (
+        not isinstance(path, list)
+        or not path
+        or not all(isinstance(part, str) and part.strip() for part in path)
+    ):
+        raise ValueError("municipal_subject.path must be a non-empty list of strings")
+    code = select_subject(record)
+    if path not in [row["path"] for row in load_catalog()[code]]:
+        raise ValueError("Recorded subject path is not in the captured catalog")
+    return path
+
+
+def is_parking_selection(record: dict[str, Any]) -> bool:
+    """Parking determination for one record: the recorded path wins when given."""
+    path = recorded_path(record)
+    if path is not None:
+        return path[0] == "חניה אסורה"
+    return is_parking_subject(select_subject(record))
+
+
 def validate_owner_choice(record: dict[str, Any], code: str) -> None:
     """Require the recorded choice to match the true event, never change its type.
 
@@ -132,6 +163,7 @@ def validate_owner_choice(record: dict[str, Any], code: str) -> None:
         or choice.get("event_type") != category
     ):
         raise ValueError("Record the owner's exact subject choice and true event type")
+    recorded_path(record)  # Validate a recorded catalog path, when present.
     if (
         not isinstance(record.get("approved_description"), str)
         or not record["approved_description"].strip()

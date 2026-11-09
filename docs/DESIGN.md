@@ -80,7 +80,8 @@ No municipality requests occur in tests. docs/API106.md owns API/state semantics
 
 `subjects.py` loads a packaged, validated snapshot of municipal subject codes.
 Each report selects a subject in its own `municipal_subject` field. Intake uses
-the selected subject to choose vehicle or general-issue draft semantics; it
+the selected subject (and its recorded catalog `path`, when given) to choose
+vehicle or general-issue draft semantics; it
 never infers a subject from the photo or relabels the true event. Non-vehicle
 issues need no plate. Explicit routing records the owner choice and matching
 event type, and requires exact approved text before any live transport. The

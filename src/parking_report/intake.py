@@ -106,9 +106,9 @@ def _build_car(
 def record_to_car(record: object) -> dict[str, str]:
     """Map one record to the car mapping used by report.py. Raises ValueError if not usable."""
     data, violation, address, street, number = _validate_record(record)
-    from .subjects import is_parking_subject, select_subject
+    from .subjects import is_parking_selection
 
-    parking = is_parking_subject(select_subject(data))
+    parking = is_parking_selection(data)
     if not parking and not _text(violation.get("description")):
         raise ValueError("A municipal issue needs an observed description")
     car = _build_car(data, violation, address, f"{street} {number}".strip(), parking)
