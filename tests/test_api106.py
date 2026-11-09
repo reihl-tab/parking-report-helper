@@ -232,6 +232,32 @@ class HebrewFinalLetterTests(unittest.TestCase):
         with self.assertRaisesRegex(api106.InputError, "unique municipal match"):
             addr.resolve("בן אבי", "7", gps)
 
+    def test_approximate_owner_confirmed_number_uses_street_centroid(self):
+        addr = self._addresses(
+            [{"StreetCode": "1366", "StreetName": "מעגלי יבנה"}],
+            [
+                [31.759107, 35.212276, "1", "מעגלי יבנה"],
+                [31.756002, 35.210245, "24", "מעגלי יבנה"],
+            ],
+        )
+        with self.assertRaisesRegex(
+            api106.InputError, "absent from the address data"
+        ):
+            addr.resolve("מעגלי יבנה", "110", None)
+        result = addr.resolve("מעגלי יבנה", "110", None, approximate=True)
+        self.assertEqual(result["street_code"], "1366")
+        self.assertEqual(result["house"], "110")
+        self.assertEqual(result["coordinate_source"], "approximate_street_centroid")
+        (x1, y1) = api106.ITM.transform(35.212276, 31.759107)
+        (x2, y2) = api106.ITM.transform(35.210245, 31.756002)
+        self.assertEqual(result["x"], int((x1 + x2) / 2))
+        self.assertEqual(result["y"], int((y1 + y2) / 2))
+
+    def test_approximate_needs_street_points(self):
+        addr = self._addresses([{"StreetCode": "1366", "StreetName": "מעגלי יבנה"}], [])
+        with self.assertRaisesRegex(api106.InputError, "no address points"):
+            addr.resolve("מעגלי יבנה", "110", None, approximate=True)
+
     def test_resolve_accepts_final_letter_variant(self):
         addr = self._addresses(
             [

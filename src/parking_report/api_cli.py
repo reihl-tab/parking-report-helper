@@ -59,7 +59,10 @@ def prepare(
     )
     address = record["address"]
     resolved = Addresses(addresses).resolve(
-        check_text(address["street"], "Street"), str(address["house_number"]), gps
+        check_text(address["street"], "Street"),
+        str(address["house_number"]),
+        gps,
+        approximate=bool(address.get("approximate")),
     )
     description = build_report(car)
     if "approved_description" in record:

@@ -90,6 +90,13 @@ set address.approximate=true, and store source/source_url and distance in notes.
 Do not combine a number from one street with another street's name. A range-
 interpolated point is not a verified building frontage.
 
+When the owner confirms a number that is absent from the municipal address
+points and the photo has no GPS, preparation keeps the owner-confirmed number,
+sets address.approximate=true, records the confirmation in address.source, and
+resolves the pin to the street centroid (coordinate_source
+approximate_street_centroid). Without approximate=true the same record is
+rejected, and a street with no municipal points at all is always rejected.
+
 ## Location description
 
 New records must include location_description: a factual Hebrew description of where
