@@ -194,14 +194,18 @@ def street_names(street: Any) -> Any:
     return [name for name in names if name and normalize(name)]
 
 
-def check_street_gps(all_points: Any, code: str, house_points: Any, gps_xy: Any) -> None:
+def check_street_gps(
+    all_points: Any, code: str, house_points: Any, gps_xy: Any
+) -> None:
     """Reject distant exact-name choices when the house is absent (#270)."""
     if house_points:
         return  # Existing house-distance guard owns this case.
     street_points = [p for p in all_points if p[3] == code]
-    if street_points and min(
-        math.hypot(p[0] - gps_xy[0], p[1] - gps_xy[1]) for p in street_points
-    ) > 200:
+    if (
+        street_points
+        and min(math.hypot(p[0] - gps_xy[0], p[1] - gps_xy[1]) for p in street_points)
+        > 200
+    ):
         raise InputError(
             "The supplied street is more than 200 m from the photo GPS. Check the street."
         )
@@ -226,6 +230,87 @@ def _absent_house_fallback(points: Any, code: Any, approximate: Any) -> Any:
         sum(p[1] for p in street_points) / len(street_points),
         "approximate_street_centroid",
     )
+
+
+def _unique_street_code(aliases: Any, street_name: Any) -> Any:
+    """The one municipal street code a supplied name maps to, or fail (#318)."""
+    codes = aliases.get(normalize(street_name), set())
+    if len(codes) != 1:
+        raise InputError(
+            "Street name has no unique municipal match. Use the exact Hebrew street name."
+        )
+    return next(iter(codes))
+
+
+def _locate_named_address(
+    all_points: Any, code: Any, house: Any, gps_xy: Any, approximate: Any
+) -> Any:
+    """(x, y, source) for a named street and house (#318, split from resolve)."""
+    if not re.fullmatch("[0-9]+[\\w /\\-]*", house) or len(house) > 16:
+        raise InputError("Invalid house number.")
+    points = [
+        p for p in all_points if p[3] == code and normalize(p[2]) == normalize(house)
+    ]
+    if gps_xy:
+        (x, y) = gps_xy
+        if points and min(math.hypot(p[0] - x, p[1] - y) for p in points) > 200:
+            raise InputError(
+                "The supplied address is more than 200 m from the photo GPS. Check the address."
+            )
+        check_street_gps(all_points, code, points, gps_xy)
+        return (x, y, "photo_gps")
+    if not points:
+        return _absent_house_fallback(all_points, code, approximate)
+    (x, y) = points[0][:2]
+    if any(math.hypot(p[0] - x, p[1] - y) > 100 for p in points):
+        raise InputError("This address has multiple locations. Use a photo with GPS.")
+    return (x, y, "address_lookup")
+
+
+def _nearby_addresses(all_points: Any, x: Any, y: Any) -> Any:
+    """Up to five distinct addresses within 150 m, nearest first (#318)."""
+    (nearby, seen) = ([], set())
+    for point in sorted(all_points, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2):
+        (px, py, number, street_code, name) = point
+        distance = math.hypot(px - x, py - y)
+        if distance > 150:
+            break
+        identity = (street_code or normalize(name), number)
+        if identity not in seen:
+            seen.add(identity)
+            nearby.append((distance, number, street_code, name))
+        if len(nearby) == 5:
+            break
+    return nearby
+
+
+def _locate_from_gps(all_points: Any, streets: Any, gps_xy: Any) -> Any:
+    """(x, y, street code, house) from photo GPS alone, or fail (#318)."""
+    if not gps_xy:
+        raise InputError(
+            "Photo has no usable GPS. Supply --address or --street and --house."
+        )
+    (x, y) = gps_xy
+    nearby = _nearby_addresses(all_points, x, y)
+    if (
+        not nearby
+        or nearby[0][2] is None
+        or nearby[0][0] > 35
+        or (len(nearby) > 1 and nearby[1][0] - nearby[0][0] < 8)
+    ):
+        choices = "; ".join(
+            f"{(streets[c]['StreetName'] if c else name)} {h} ({d:.0f} m)"
+            for (d, h, c, name) in nearby
+        )
+        raise InputError(
+            "GPS does not identify one clear address. Supply --address. Nearby: "
+            + (choices or "none")
+        )
+    (_, house, nearest_code, _) = nearby[0]
+    # The guard above already rejected a None street code; this only
+    # narrows the type for mypy (no behavior change).
+    assert nearest_code is not None
+    return (x, y, nearest_code, house)
 
 
 class Addresses:
@@ -255,78 +340,12 @@ class Addresses:
     ) -> Any:
         gps_xy = ITM.transform(gps[1], gps[0]) if gps else None
         if street_name:
-            codes = self.aliases.get(normalize(street_name), set())
-            if len(codes) != 1:
-                raise InputError(
-                    "Street name has no unique municipal match. Use the exact Hebrew street name."
-                )
-            code = next(iter(codes))
-            if not re.fullmatch("[0-9]+[\\w /\\-]*", house) or len(house) > 16:
-                raise InputError("Invalid house number.")
-            points = [
-                p
-                for p in self.points
-                if p[3] == code and normalize(p[2]) == normalize(house)
-            ]
-            if gps_xy:
-                (x, y) = gps_xy
-                if points and min(math.hypot(p[0] - x, p[1] - y) for p in points) > 200:
-                    raise InputError(
-                        "The supplied address is more than 200 m from the photo GPS. Check the address."
-                    )
-                check_street_gps(self.points, code, points, gps_xy)
-                source = "photo_gps"
-            else:
-                if not points:
-                    (x, y, source) = _absent_house_fallback(
-                        self.points, code, approximate
-                    )
-                else:
-                    (x, y) = points[0][:2]
-                    if any(math.hypot(p[0] - x, p[1] - y) > 100 for p in points):
-                        raise InputError(
-                            "This address has multiple locations. Use a photo with GPS."
-                        )
-                    source = "address_lookup"
+            code = _unique_street_code(self.aliases, street_name)
+            (x, y, source) = _locate_named_address(
+                self.points, code, house, gps_xy, approximate
+            )
         else:
-            if not gps_xy:
-                raise InputError(
-                    "Photo has no usable GPS. Supply --address or --street and --house."
-                )
-            (x, y) = gps_xy
-            (nearby, seen) = ([], set())
-            for point in sorted(
-                self.points, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2
-            ):
-                (px, py, number, street_code, name) = point
-                distance = math.hypot(px - x, py - y)
-                if distance > 150:
-                    break
-                identity = (street_code or normalize(name), number)
-                if identity not in seen:
-                    seen.add(identity)
-                    nearby.append((distance, number, street_code, name))
-                if len(nearby) == 5:
-                    break
-            if (
-                not nearby
-                or nearby[0][2] is None
-                or nearby[0][0] > 35
-                or (len(nearby) > 1 and nearby[1][0] - nearby[0][0] < 8)
-            ):
-                choices = "; ".join(
-                    f"{(self.streets[c]['StreetName'] if c else name)} {h} ({d:.0f} m)"
-                    for (d, h, c, name) in nearby
-                )
-                raise InputError(
-                    "GPS does not identify one clear address. Supply --address. Nearby: "
-                    + (choices or "none")
-                )
-            (_, house, nearest_code, _) = nearby[0]
-            # The guard above already rejected a None street code; this only
-            # narrows the type for mypy (no behavior change).
-            assert nearest_code is not None
-            code = nearest_code
+            (x, y, code, house) = _locate_from_gps(self.points, self.streets, gps_xy)
             source = "photo_gps"
         return {
             "street_code": code,
