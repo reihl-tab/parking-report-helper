@@ -479,7 +479,7 @@ class TestRecordToCarFieldMapping(unittest.TestCase):
 
         self.assertEqual(
             car["notes"],
-            "חונה על המדרכה. הכתובת היא קירוב לפי הבניין הממוספר הקרוב לנקודת הצילום",
+            "חונה על המדרכה. הכתובת היא קירוב",
         )
 
     def test_registry_text_added_for_parking_reports(self):

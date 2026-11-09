@@ -65,6 +65,12 @@ def prepare(
         # Only a JSON true opts in; "false", 0 or 1 stay fail-closed (#317).
         approximate=address.get("approximate") is True,
     )
+    if address.get("approximate") is True:
+        if resolved["coordinate_source"] == "approximate_street_centroid":
+            # No GPS and no municipal point: owner-confirmed number, centroid pin.
+            car["notes"] += " (מיקום משוער: מרכז הרחוב; המספר אומת מול הבעלים)"
+        elif gps:
+            car["notes"] += " לפי הבניין הממוספר הקרוב לנקודת הצילום"
     description = build_report(car)
     if "approved_description" in record:
         check_text(record["approved_description"], "Reviewed report text")

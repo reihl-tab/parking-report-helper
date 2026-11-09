@@ -99,7 +99,7 @@ def _build_car(
     if registry_text:
         car["registry_text"] = registry_text
     if address.get("approximate"):
-        car["notes"] += ". הכתובת היא קירוב לפי הבניין הממוספר הקרוב לנקודת הצילום"
+        car["notes"] += ". הכתובת היא קירוב"
     return car
 
 

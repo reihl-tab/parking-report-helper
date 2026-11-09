@@ -258,6 +258,18 @@ class HebrewFinalLetterTests(unittest.TestCase):
         with self.assertRaisesRegex(api106.InputError, "no address points"):
             addr.resolve("רחוב הדוגמה", "77", None, approximate=True)
 
+    def test_approximate_centroid_too_far_from_street_points_fails(self):
+        # Broken data (mixed units/CRS): the mean sits kilometres away.
+        addr = self._addresses(
+            [{"StreetCode": "9203", "StreetName": "שדרות הדוגמה הארוכה"}],
+            [
+                [31.750000, 35.200000, "1", "שדרות הדוגמה הארוכה"],
+                [31.772000, 35.220000, "99", "שדרות הדוגמה הארוכה"],
+            ],
+        )
+        with self.assertRaisesRegex(api106.InputError, "over 1 km"):
+            addr.resolve("שדרות הדוגמה הארוכה", "500", None, approximate=True)
+
     def test_resolve_accepts_final_letter_variant(self):
         addr = self._addresses(
             [

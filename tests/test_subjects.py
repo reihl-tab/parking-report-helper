@@ -265,3 +265,72 @@ class SubjectTests(unittest.TestCase):
             )
             self.assertEqual(out.returncode, 4)
             self.assertNotIn("fake", out.stdout)
+
+
+class ApproximateNoteTests(unittest.TestCase):
+    """The note wording matches the path the pin actually took (#316 F4b)."""
+
+    def setUp(self):
+        tmp = TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.folder = Path(tmp.name)
+        self.addresses = self.folder / "addresses.json"
+        self.addresses.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "streets": [{"StreetCode": "9201", "StreetName": "רחוב לדוגמה"}],
+                    "addresses": [[31.781000, 35.221000, "1", "רחוב לדוגמה"]],
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.reporter = {
+            "first_name": "שם",
+            "last_name": "לדוגמה",
+            "phone": SYNTHETIC_PHONE,
+            "id_number": SYNTHETIC_ID,
+            "email": "example@example.invalid",
+        }
+
+    def photo(self, latlon=None):
+        from PIL import Image
+        from test_read_picture import gps_exif, jpeg_bytes
+
+        raw = jpeg_bytes(
+            Image.new("RGB", (10, 10), "white"), gps_exif(*latlon) if latlon else None
+        )
+        (self.folder / "photo.jpg").write_bytes(raw)
+
+    def record(self, approximate):
+        value = record()
+        del value["approved_description"]  # build_report path: the note enters the text
+        value["address"]["house_number"] = "500"  # absent from the synthetic points
+        value["address"]["approximate"] = approximate
+        (self.folder / "report.json").write_text(
+            json.dumps(value, ensure_ascii=False), encoding="utf-8"
+        )
+
+    def test_centroid_pin_says_street_centroid_owner_confirmed(self):
+        self.photo()
+        self.record(True)
+        _, payload, _, _ = prepare(self.folder, self.addresses, self.reporter)
+        self.assertEqual(payload["CaseHouseNumber"], "500")
+        self.assertIn("מרכז הרחוב", payload["CaseDescription"])
+        self.assertIn("אומת מול הבעלים", payload["CaseDescription"])
+        self.assertNotIn("נקודת הצילום", payload["CaseDescription"])
+
+    def test_gps_pin_keeps_the_nearest_building_sentence(self):
+        self.photo((31.781000, 35.221000))
+        self.record(True)
+        _, payload, _, _ = prepare(self.folder, self.addresses, self.reporter)
+        self.assertIn(
+            "הכתובת היא קירוב לפי הבניין הממוספר הקרוב לנקודת הצילום",
+            payload["CaseDescription"],
+        )
+
+    def test_without_the_flag_the_absent_house_fails_closed(self):
+        self.photo()
+        self.record(False)
+        with self.assertRaises(Exception):
+            prepare(self.folder, self.addresses, self.reporter)
