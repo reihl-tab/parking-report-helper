@@ -1,7 +1,9 @@
 """`p106-stats` command line: export file in, local statistics out (issue #210).
 
 `build` writes machine-readable outputs (summary.json + CSVs) and a
-self-contained RTL HTML report (report.html) with pure-SVG charts (#212).
+self-contained HTML report (report.html) with pure-SVG charts (#212), in
+the report catalog's default language or any catalog language via --lang
+(td423).
 `refresh` fetches the reporter's current cases from GetContactCases,
 unions them with archived exports by case_number and runs the same build
 (parking-stats #13).
@@ -19,6 +21,7 @@ import sys
 from pathlib import Path
 
 from .api106 import APIError, InputError, Municipality
+from .report_i18n import language_code
 from .stats import (
     StatsError,
     load_incidents,
@@ -33,6 +36,12 @@ NEIGHBORHOODS_HELP = (
     "optional UTF-8 JSON file with one object mapping street name to "
     "neighborhood name; fills by_neighborhood in summary.json (unmapped "
     "streets count as (אחר)) and adds the neighborhood chart to report.html"
+)
+LANG_HELP = (
+    "language of report.html's own text: a language code from the report "
+    "catalog (configs/report_strings.json); default: the catalog's default "
+    "language. City data and summary.json stay as the city wrote them; an "
+    "unknown code exits 2 and lists the catalog's languages"
 )
 # Fixed messages: never the path, the file's contents or the parser's text (#225).
 NEIGHBORHOODS_UNREADABLE = "--neighborhoods: the mapping file could not be read"
@@ -75,6 +84,9 @@ def build_parser() -> argparse.ArgumentParser:
         "filed reports) - the ledger itself never leaves the machine",
     )
     build.add_argument("--neighborhoods", default=None, help=NEIGHBORHOODS_HELP)
+    build.add_argument(
+        "--lang", type=language_code, default=None, metavar="CODE", help=LANG_HELP
+    )
     refresh = sub.add_parser(
         "refresh",
         help="fetch current cases from GetContactCases, union with archived "
@@ -111,6 +123,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="optional private filing-ledger CSV (same aggregation as build)",
     )
     refresh.add_argument("--neighborhoods", default=None, help=NEIGHBORHOODS_HELP)
+    refresh.add_argument(
+        "--lang", type=language_code, default=None, metavar="CODE", help=LANG_HELP
+    )
     refresh.add_argument(
         "--save-union",
         default=None,
@@ -221,7 +236,7 @@ def _refresh(args) -> int:
     summary["inputs"] = [Path(p).name for p in args.archive] + ["GetContactCases"]
     summary["duplicates_skipped"] = duplicates
     summary["repeat_plates_count"] = len(plate_rows)
-    _write_outputs(summary, plate_rows, Path(args.output))
+    _write_outputs(summary, plate_rows, Path(args.output), args.lang)
     print(
         f"{PROG}: refresh: {len(fetched)} fetched "
         f"({overlaps} refreshed archived rows), "
@@ -230,7 +245,9 @@ def _refresh(args) -> int:
     return 0
 
 
-def _write_outputs(summary: dict, plate_rows: list[dict], out_dir: Path) -> None:
+def _write_outputs(
+    summary: dict, plate_rows: list[dict], out_dir: Path, lang: str | None = None
+) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -257,7 +274,9 @@ def _write_outputs(summary: dict, plate_rows: list[dict], out_dir: Path) -> None
         # Any build that does not emit plates.csv removes a stale one
         # (with or without the flag) so it cannot be published by mistake.
         plates_path.unlink()
-    (out_dir / "report.html").write_text(build_report(summary), encoding="utf-8")
+    (out_dir / "report.html").write_text(
+        build_report(summary, lang=lang), encoding="utf-8"
+    )
 
 
 def _plates(args) -> tuple[list[dict], int]:
@@ -325,7 +344,7 @@ def _build(args) -> int:
     if code:
         return code
     summary["repeat_plates_count"] = len(plate_rows)
-    _write_outputs(summary, plate_rows, Path(args.output))
+    _write_outputs(summary, plate_rows, Path(args.output), args.lang)
     print(
         f"{PROG}: {summary['total_incidents']} incidents "
         f"({duplicates} duplicates skipped) -> {args.output}"

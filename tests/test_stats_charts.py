@@ -103,6 +103,7 @@ class BuildReportTest(unittest.TestCase):
 
     def test_full_document(self):
         page = build_report(self._summary())
+        # i18n-pin: the default report.html stays Hebrew, right to left
         self.assertIn('<html lang="he" dir="rtl">', page)
         self.assertIn("סטטיסטיקת דיווחי 106", page)
         self.assertEqual(page.count("<svg"), 8)

@@ -1,0 +1,157 @@
+{
+  "languages": [
+    {
+      "code": "he",
+      "name": "עברית",
+      "dir": "rtl",
+      "default": true,
+      "machine_draft": false
+    },
+    {
+      "code": "fr",
+      "name": "Français",
+      "dir": "ltr",
+      "default": false,
+      "machine_draft": true,
+      "status": "machine-draft, needs native review"
+    }
+  ],
+  "strings": {
+    "report.title": {
+      "he": "סטטיסטיקת דיווחי 106",
+      "fr": "Statistiques des signalements 106"
+    },
+    "report.generated": {
+      "he": "נוצר מקומית על ידי p106-stats. קבצי קלט: {inputs}",
+      "fr": "Généré localement par p106-stats. Fichiers d’entrée : {inputs}"
+    },
+    "report.machine_draft_note": {
+      "he": "הנוסח בשפה זו הוא טיוטת תרגום ממוחשבת שטרם נבדקה על ידי דובר/ת השפה.",
+      "fr": "Le texte de cette page est une traduction automatique provisoire, pas encore relue par un locuteur natif."
+    },
+    "report.city_data_note": {
+      "he": "שמות הקטגוריות, הרחובות, הכתובות והסטטוסים מוצגים כפי שהם מופיעים בנתוני העירייה, בעברית.",
+      "fr": "Les catégories, rues, adresses et statuts sont affichés tels qu’ils figurent dans les données de la municipalité, en hébreu."
+    },
+    "section.overview": {
+      "he": "סקירה",
+      "fr": "Vue d’ensemble"
+    },
+    "overview.total": {
+      "he": "סה\"כ פניות",
+      "fr": "Total des signalements"
+    },
+    "overview.duplicates": {
+      "he": "כפילויות שדולגו",
+      "fr": "Doublons ignorés"
+    },
+    "overview.date_range": {
+      "he": "טווח תאריכים",
+      "fr": "Période"
+    },
+    "overview.date_range_value": {
+      "he": "{first} עד {last}",
+      "fr": "du {first} au {last}"
+    },
+    "overview.closed": {
+      "he": "פניות שנסגרו",
+      "fr": "Signalements clôturés"
+    },
+    "overview.median_days": {
+      "he": "חציון זמן סגירה (ימים)",
+      "fr": "Délai médian de clôture (jours)"
+    },
+    "overview.p75_days": {
+      "he": "רבעון עליון (ימים)",
+      "fr": "Quartile supérieur (jours)"
+    },
+    "overview.max_days": {
+      "he": "סגירה מקסימלית (ימים)",
+      "fr": "Délai de clôture maximal (jours)"
+    },
+    "chart.by_month": {
+      "he": "דיווחים לפי חודש",
+      "fr": "Signalements par mois"
+    },
+    "section.by_week": {
+      "he": "דיווחים לפי שבוע",
+      "fr": "Signalements par semaine"
+    },
+    "chart.by_week": {
+      "he": "דיווחים לפי שבוע (12 אחרונים)",
+      "fr": "Signalements par semaine (12 dernières)"
+    },
+    "chart.by_category": {
+      "he": "דיווחים לפי קטגוריה",
+      "fr": "Signalements par catégorie"
+    },
+    "chart.by_neighborhood": {
+      "he": "דיווחים לפי שכונה",
+      "fr": "Signalements par quartier"
+    },
+    "chart.top_streets": {
+      "he": "הרחובות המדווחים ביותר",
+      "fr": "Rues les plus signalées"
+    },
+    "section.hotspots": {
+      "he": "נקודות חמות",
+      "fr": "Points chauds"
+    },
+    "chart.hotspots": {
+      "he": "נקודות חמות: הכתובות המדווחות ביותר",
+      "fr": "Points chauds : adresses les plus signalées"
+    },
+    "section.closure": {
+      "he": "זמני סגירה",
+      "fr": "Délais de clôture"
+    },
+    "chart.closure": {
+      "he": "זמן סגירת פניות (חלוקה לדליים)",
+      "fr": "Délai de clôture des signalements (par tranche)"
+    },
+    "chart.closure_by_category": {
+      "he": "חציון ימי סגירה לפי קטגוריה",
+      "fr": "Délai médian de clôture par catégorie (jours)"
+    },
+    "chart.by_status": {
+      "he": "סטטוס פניות",
+      "fr": "Statut des signalements"
+    },
+    "chart.no_data": {
+      "he": "אין נתונים",
+      "fr": "Aucune donnée"
+    },
+    "closure.under_1h": {
+      "he": "עד שעה",
+      "fr": "Moins d’une heure"
+    },
+    "closure.1h_to_8h": {
+      "he": "שעה עד 8 שעות",
+      "fr": "De 1 à 8 heures"
+    },
+    "closure.8h_to_1d": {
+      "he": "8 שעות עד יממה",
+      "fr": "De 8 à 24 heures"
+    },
+    "closure.1d_to_7d": {
+      "he": "יממה עד שבוע",
+      "fr": "De 1 à 7 jours"
+    },
+    "closure.over_7d": {
+      "he": "מעל שבוע",
+      "fr": "Plus d’une semaine"
+    },
+    "label.no_street": {
+      "he": "(ללא רחוב)",
+      "fr": "(sans rue)"
+    },
+    "label.unknown": {
+      "he": "(לא ידוע)",
+      "fr": "(inconnu)"
+    },
+    "label.other_neighborhood": {
+      "he": "(אחר)",
+      "fr": "(autre)"
+    }
+  }
+}

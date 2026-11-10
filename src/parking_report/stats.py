@@ -46,6 +46,7 @@ from typing import Any, Iterable
 
 NO_STREET = "(ללא רחוב)"
 UNKNOWN = "(לא ידוע)"
+OTHER_NEIGHBORHOOD = "(אחר)"  # streets the --neighborhoods mapping does not name
 
 # Closure-time buckets in days: <1h, 1-8h, 8-24h, 1-7d, >7d.
 CLOSURE_BUCKETS = (
@@ -216,7 +217,7 @@ def _by_neighborhood(
     counts: dict[str, int] = {}
     for incident in incidents:
         street = _text(incident, "streetname", NO_STREET)
-        area = neighborhoods.get(street, "(אחר)")
+        area = neighborhoods.get(street, OTHER_NEIGHBORHOOD)
         counts[area] = counts.get(area, 0) + 1
     return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
 

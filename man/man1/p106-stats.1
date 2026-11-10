@@ -50,6 +50,12 @@ neighborhood name; fills by_neighborhood in summary.json (unmapped
 streets count as (אחר)) and adds the neighborhood chart to
 report.html.
 .TP
+\fB\-\-lang\fR \fICODE\fR
+Language of report.html's own text: a language code from the report
+catalog (configs/report_strings.json); default: the catalog's default
+language. City data and summary.json stay as the city wrote them; an
+unknown code exits 2 and lists the catalog's languages.
+.TP
 \fIinputs\fR
 Reports_raw.json export file(s)
 .SS "refresh options"
@@ -81,6 +87,12 @@ neighborhood name; fills by_neighborhood in summary.json (unmapped
 streets count as (אחר)) and adds the neighborhood chart to
 report.html.
 .TP
+\fB\-\-lang\fR \fICODE\fR
+Language of report.html's own text: a language code from the report
+catalog (configs/report_strings.json); default: the catalog's default
+language. City data and summary.json stay as the city wrote them; an
+unknown code exits 2 and lists the catalog's languages.
+.TP
 \fB\-\-save\-union\fR \fISAVE_UNION\fR
 Optional path for the merged raw export (PRIVATE: contains case texts;
 keep outside any published repository)
@@ -97,8 +109,9 @@ refresh: missing environment variables, a failed fetch or union, or an
 unwritable \-\-save\-union path), \fBp106\-stats: ...\fR on stderr.
 .TP
 .B 2
-Usage error (argparse, or an invalid value such as \-\-top\-streets 0 or
-a refresh \-\-from that is not a YYYY\-MM\-DD date), message on stderr.
+Usage error (argparse, or an invalid value such as \-\-top\-streets 0, a
+\-\-lang code that is not in the report catalog, or a refresh \-\-from
+that is not a YYYY\-MM\-DD date), message on stderr.
 .SH SEE ALSO
 .BR parking\-report (1),
 .BR parking\-report\-106 (1),

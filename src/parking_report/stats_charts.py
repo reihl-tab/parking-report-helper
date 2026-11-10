@@ -3,11 +3,16 @@
 Pure-python SVG keeps the package dependency-free (CI hash-locks every
 dependency) and fully testable: charts are strings, assertions are string
 and structure checks. Hebrew labels are written RTL; numbers stay LTR.
+Titles and the empty-chart text come from the report catalog
+(report_i18n) in the page language; the bar labels are the city's data
+and stay Hebrew, so every chart keeps its RTL layout.
 """
 
 from __future__ import annotations
 
 import html
+
+from .report_i18n import text
 
 BAR_HEIGHT = 22
 BAR_GAP = 6
@@ -27,6 +32,7 @@ def horizontal_bars(
     title: str,
     color: str = COLORS[0],
     label_width: int = LABEL_WIDTH,
+    lang: str | None = None,
 ) -> str:
     """One SVG bar chart: Hebrew-friendly horizontal bars, values at the end."""
     width = label_width + 400 + VALUE_WIDTH + PADDING * 2
@@ -35,7 +41,7 @@ def horizontal_bars(
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" '
             f'height="60" dir="rtl"><text x="50%" y="35" text-anchor="middle" '
-            f'font-size="14">אין נתונים</text></svg>'
+            f'font-size="14">{_esc(text("chart.no_data", lang))}</text></svg>'
         )
     maximum = max(value for _, value in series) or 1
     parts = [
@@ -61,66 +67,88 @@ def horizontal_bars(
     return "".join(parts)
 
 
-def monthly_chart(by_month: dict[str, int]) -> str:
+def monthly_chart(by_month: dict[str, int], lang: str | None = None) -> str:
     return horizontal_bars(
-        list(by_month.items()), title="דיווחים לפי חודש", label_width=90
+        list(by_month.items()),
+        title=text("chart.by_month", lang),
+        label_width=90,
+        lang=lang,
     )
 
 
-def category_chart(by_category: dict[str, int]) -> str:
+def category_chart(by_category: dict[str, int], lang: str | None = None) -> str:
     return horizontal_bars(
-        list(by_category.items()), title="דיווחים לפי קטגוריה", color=COLORS[1]
+        list(by_category.items()),
+        title=text("chart.by_category", lang),
+        color=COLORS[1],
+        lang=lang,
     )
 
 
-def street_chart(by_street: dict[str, int]) -> str:
+def street_chart(by_street: dict[str, int], lang: str | None = None) -> str:
     return horizontal_bars(
-        list(by_street.items()), title="הרחובות המדווחים ביותר", color=COLORS[3]
+        list(by_street.items()),
+        title=text("chart.top_streets", lang),
+        color=COLORS[3],
+        lang=lang,
     )
 
 
-def closure_chart(buckets: dict[str, int]) -> str:
+def closure_chart(buckets: dict[str, int], lang: str | None = None) -> str:
     return horizontal_bars(
         list(buckets.items()),
-        title="זמן סגירת פניות (חלוקה לדליים)",
+        title=text("chart.closure", lang),
         color=COLORS[4],
         label_width=150,
+        lang=lang,
     )
 
 
-def weekly_chart(by_week: dict[str, int]) -> str:
+def weekly_chart(by_week: dict[str, int], lang: str | None = None) -> str:
     return horizontal_bars(
-        list(by_week.items()), title="דיווחים לפי שבוע (12 אחרונים)", label_width=90
+        list(by_week.items()),
+        title=text("chart.by_week", lang),
+        label_width=90,
+        lang=lang,
     )
 
 
-def hotspot_chart(hotspots: dict[str, int]) -> str:
+def hotspot_chart(hotspots: dict[str, int], lang: str | None = None) -> str:
     return horizontal_bars(
         list(hotspots.items()),
-        title="נקודות חמות: הכתובות המדווחות ביותר",
+        title=text("chart.hotspots", lang),
         color=COLORS[2],
         label_width=190,
+        lang=lang,
     )
 
 
-def neighborhood_chart(by_neighborhood: dict[str, int]) -> str:
+def neighborhood_chart(by_neighborhood: dict[str, int], lang: str | None = None) -> str:
     return horizontal_bars(
         list(by_neighborhood.items()),
-        title="דיווחים לפי שכונה",
+        title=text("chart.by_neighborhood", lang),
         color=COLORS[5],
         label_width=150,
+        lang=lang,
     )
 
 
-def status_chart(by_status: dict[str, int]) -> str:
+def status_chart(by_status: dict[str, int], lang: str | None = None) -> str:
     return horizontal_bars(
-        list(by_status.items()), title="סטטוס פניות", color=COLORS[3], label_width=130
+        list(by_status.items()),
+        title=text("chart.by_status", lang),
+        color=COLORS[3],
+        label_width=130,
+        lang=lang,
     )
 
 
-def closure_by_category_chart(medians: dict[str, float]) -> str:
+def closure_by_category_chart(
+    medians: dict[str, float], lang: str | None = None
+) -> str:
     return horizontal_bars(
         list(medians.items()),
-        title="חציון ימי סגירה לפי קטגוריה",
+        title=text("chart.closure_by_category", lang),
         color=COLORS[4],
+        lang=lang,
     )
